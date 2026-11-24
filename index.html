@@ -729,7 +729,7 @@ async function saveKrathong() {
 /* ========================= UI HELPERS ========================= */
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3200); }
-let musicContext = null, musicGain = null, musicTimer = null, musicStep = 0, musicStarting = false, musicAutoStart = true;
+let musicContext = null, musicGain = null, musicTimer = null, musicStep = 0, musicAutoStart = true;
 const musicNotes = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 698.46, 659.25, 783.99, 1046.5, 783.99, 698.46, 880, 987.77, 880];
 function playMusicTone(frequency, duration, volume, type) {
   if (!musicContext || !musicGain) return;
@@ -752,8 +752,7 @@ function playMusicBeat() {
 }
 async function startMusic(quiet = false) {
   const button = $('#musicToggle');
-  if (button.getAttribute('aria-pressed') === 'true' || musicStarting) return;
-  musicStarting = true;
+  if (button.getAttribute('aria-pressed') === 'true') return true;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   try {
     if (!AudioContextClass) throw new Error('Audio playback is not supported');
@@ -765,17 +764,20 @@ async function startMusic(quiet = false) {
     }
     await musicContext.resume();
     if (musicContext.state !== 'running') {
+      button.textContent = '♪ แตะเพื่อเปิดเสียง';
       if (!quiet) toast('แตะหน้าจอเพื่อเริ่มเพลง');
-      return;
+      return false;
     }
-    musicGain.gain.setTargetAtTime(.055, musicContext.currentTime, .3);
+    if (button.getAttribute('aria-pressed') === 'true') return true;
+    musicGain.gain.setTargetAtTime(.12, musicContext.currentTime, .3);
     button.setAttribute('aria-pressed', 'true'); button.textContent = '♪ ปิดเพลง';
     playMusicBeat(); musicTimer = setInterval(playMusicBeat, 350);
+    return true;
   } catch (error) {
     console.error('Music playback failed', error);
+    button.textContent = '♪ แตะเพื่อเปิดเสียง';
     if (!quiet) toast('เปิดเพลงไม่สำเร็จ');
-  } finally {
-    musicStarting = false;
+    return false;
   }
 }
 function stopMusic() {
@@ -791,12 +793,13 @@ async function toggleMusic() {
   if (enabled) stopMusic();
   else await startMusic();
 }
-function resumeMusicAfterGesture(event) {
+async function resumeMusicAfterGesture(event) {
   const target = event.target;
   if (!musicAutoStart || (target && target.closest && target.closest('#musicToggle'))) return;
-  document.removeEventListener('pointerdown', resumeMusicAfterGesture);
-  document.removeEventListener('keydown', resumeMusicAfterGesture);
-  startMusic(true);
+  if (await startMusic(true)) {
+    document.removeEventListener('pointerdown', resumeMusicAfterGesture);
+    document.removeEventListener('keydown', resumeMusicAfterGesture);
+  }
 }
 $('#musicToggle').onclick = toggleMusic;
 document.addEventListener('pointerdown', resumeMusicAfterGesture);
