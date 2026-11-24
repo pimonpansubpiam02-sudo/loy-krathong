@@ -116,6 +116,10 @@ h2{font-family:'Mitr';font-weight:500;font-size:clamp(20px,3.6vw,28px);color:var
 .spot-search{margin:12px 0 2px}
 .spot-search label{margin-bottom:6px}
 .spot-search input{font-size:14px}
+.spot-query{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.spot-query .btn{padding:10px 16px;font-size:14px}
+.spot-search select{width:100%;font:400 14px 'Prompt';color:var(--cream);background:rgba(4,11,31,.55);border:1.5px solid rgba(185,206,255,.28);border-radius:14px;padding:11px 14px}
+.pin-mode.active{box-shadow:0 0 0 3px rgba(255,201,51,.35)}
 .spot-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;max-height:150px;overflow:auto;padding:2px}
 .spot-option{cursor:pointer;text-align:left;border:1px solid rgba(185,206,255,.2);background:rgba(15,38,86,.6);border-radius:12px;padding:9px 12px;color:var(--cream);transition:.2s}
 .spot-option:hover,.spot-option.sel{border-color:var(--gold);background:rgba(36,87,214,.55)}
@@ -253,12 +257,22 @@ input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(25
     <p class="sub">ค้นหาจังหวัดหรือวัด แล้วเลือกจุดเด่นเพื่อปักหมุดลอยกระทง</p>
     <div id="map"></div>
     <div class="spot-search">
-      <label for="spotSearch">ค้นหาจังหวัดหรือสถานที่</label>
-      <input id="spotSearch" type="search" list="provinceSuggestions" placeholder="พิมพ์หรือเลือกจังหวัด เช่น เชียงใหม่" autocomplete="off">
+      <label for="spotSearch">ค้นหาวัดหรือสถานที่ทั่วไทย</label>
+      <div class="spot-query"><input id="spotSearch" type="search" list="provinceSuggestions" placeholder="เช่น วัดในจังหวัดเชียงราย" autocomplete="off"><button class="btn sm" id="searchPlaces" type="button">ค้นหา</button></div>
       <datalist id="provinceSuggestions"></datalist>
+      <p class="privacy-note">คำค้นจะส่งไปค้นหาพิกัดกับ OpenStreetMap ถ้าไม่พบ ใช้การปักหมุดเองได้</p>
     </div>
     <div class="chips" id="spotChips"></div>
     <div class="spot-results" id="spotResults" aria-live="polite"></div>
+    <div class="customizer">
+      <h3>ไม่พบวัดที่ต้องการ? ปักหมุดเองได้</h3>
+      <div class="custom-grid">
+        <div><label for="customPlaceName">ชื่อวัด/สถานที่</label><input id="customPlaceName" maxlength="80" placeholder="เช่น วัดประจำชุมชน"></div>
+        <div><label for="customPlaceProvince">จังหวัด</label><select id="customPlaceProvince"></select></div>
+      </div>
+      <button class="btn ghost sm pin-mode" id="pinModeBtn" type="button">ปักหมุดจากแผนที่</button>
+      <p class="privacy-note" id="pinModeStatus" role="status">ค้นหาผ่าน OpenStreetMap หรือกรอกชื่อ แล้วคลิกตำแหน่งวัดบนแผนที่</p>
+    </div>
     <div id="spotInfo"><div><div class="nm">ยังไม่ได้เลือกสถานที่</div><div class="bl">แตะหมุดบนแผนที่เพื่อดูรายละเอียด</div></div></div>
     <div class="actions"><button class="btn ghost sm" data-go="krathong">← กลับ</button><button class="btn" id="mapNext" disabled>ไปยังริมน้ำ →</button></div>
   </section>
@@ -407,6 +421,7 @@ const PROVINCES = [
   'หนองบัวลำภู', 'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี', 'อุตรดิตถ์', 'อุทัยธานี', 'อุบลราชธานี'
 ];
 const SPOT = Object.fromEntries(SPOTS.map(s => [s.id, s]));
+const CUSTOM_SPOTS = {};
 const WISH_IDEAS = ['ขอให้สุขภาพแข็งแรง', 'ขอให้ครอบครัวมีความสุข', 'ขอให้รักสมหวัง', 'ขอให้การงานก้าวหน้า', 'ขอให้เงินทองไหลมาเทมา', 'ขอบคุณแม่น้ำ ขออภัยที่ทำให้สกปรก', 'ขอให้ทุกคนที่รักปลอดภัย'];
 
 /* ========================= SVG: AVATAR ========================= */
@@ -580,6 +595,34 @@ let recent = [], stats = {}, online = 1, live = false, sb = null, channel = null
 const seen = new Set();
 const totalCount = () => Object.values(stats).reduce((a, b) => a + b, 0);
 const genUUID = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const customSpotId = (lat, lng) => `custom-${Math.round(lat * 100000)}-${Math.round(lng * 100000)}`;
+function registerCustomSpot(spot) {
+  if (!spot || !spot.id || !Number.isFinite(spot.lat) || !Number.isFinite(spot.lng) || spot.lat < 5.4 || spot.lat > 20.6 || spot.lng < 97 || spot.lng > 106) return null;
+  const saved = { ...spot, custom: true, scene: 'custom', river: 'พิกัดที่เลือก', moon: [.5, .3] };
+  SPOT[saved.id] = saved; CUSTOM_SPOTS[saved.id] = saved;
+  if (map) addSpotMarker(saved);
+  return saved;
+}
+function restoreCustomSpot(row) {
+  if (!row || !row.spot_id) return null;
+  if (SPOT[row.spot_id]) return SPOT[row.spot_id];
+  const data = row.spot_data;
+  if (!data || !row.spot_id.startsWith('custom-')) return null;
+  const lat = Number(data.lat), lng = Number(data.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 5.4 || lat > 20.6 || lng < 97 || lng > 106) return null;
+  return registerCustomSpot({
+    id: row.spot_id,
+    name: String(data.name || 'สถานที่ที่ปักหมุด').slice(0, 80),
+    short: String(data.short || data.name || 'สถานที่ที่ปักหมุด').slice(0, 80),
+    prov: String(data.prov || 'ไม่ระบุจังหวัด').slice(0, 80),
+    blurb: 'หมุดที่ผู้ใช้เลือก · ภาพฉากเป็นภาพประกอบทั่วไป',
+    lat, lng
+  });
+}
+function customSpotData(spot) {
+  if (!spot || !spot.custom) return null;
+  return { name: spot.name, short: spot.short, prov: spot.prov, lat: spot.lat, lng: spot.lng };
+}
 
 const configured = /^https?:\/\//.test(CONFIG.SUPABASE_URL) && CONFIG.SUPABASE_ANON_KEY.length > 20;
 if (configured && window.supabase) { try { sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY); } catch (e) { console.warn(e); } }
@@ -600,7 +643,7 @@ async function initData() {
         sb.from('krathong_stats').select('*')
       ]);
       if (a.error) throw a.error; if (b.error) throw b.error;
-      recent = a.data; recent.forEach(r => seen.add(r.id));
+      recent = a.data; recent.forEach(r => { seen.add(r.id); restoreCustomSpot(r); });
       b.data.forEach(r => stats[r.spot_id] = r.total);
       live = true;
       channel = sb.channel('krathong-room', { config: { presence: { key: genUUID() } } })
@@ -623,6 +666,7 @@ async function initData() {
 }
 function onNew(row, own) {
   if (!row || seen.has(row.id)) return;
+  restoreCustomSpot(row);
   seen.add(row.id);
   recent.unshift(row); if (recent.length > 60) recent.pop();
   stats[row.spot_id] = (stats[row.spot_id] || 0) + 1;
@@ -646,6 +690,8 @@ function renderTicker() {
 }
 async function saveKrathong() {
   const row = { id: genUUID(), nickname: state.nick, wish: state.wish, gender: state.gender, outfit: state.outfit, krathong: state.krathong, spot_id: state.spot };
+  const spotData = customSpotData(SPOT[state.spot]);
+  if (spotData) row.spot_data = spotData;
   seen.add(row.id); state.id = row.id; state.saved = false;
   if (sb && live) {
     const { error } = await sb.from('krathongs').insert(row);
@@ -664,6 +710,12 @@ const CENTER = ['intro', 'gender', 'outfit', 'krathong', 'map'];
 const panel = $('#panel'), dock = $('#avatarDock');
 
 function go(name) {
+  if (name !== 'map' && pinMode) {
+    pinMode = false;
+    $('#pinModeBtn').classList.remove('active');
+    $('#pinModeStatus').textContent = 'ค้นหาผ่าน OpenStreetMap หรือกรอกชื่อ แล้วคลิกตำแหน่งวัดบนแผนที่';
+    if (map) map.getContainer().style.cursor = '';
+  }
   cur = name;
   $$('.step').forEach(s => s.classList.toggle('on', s.dataset.step === name));
   document.body.dataset.step = name;
@@ -797,16 +849,32 @@ function renderK() {
 $('#kNext').onclick = () => go('map');
 
 /* ----- step 4: map ----- */
-let map = null; const markers = {};
+let map = null, pinMode = false, lastPlaceSearchAt = 0, placeSearchBusy = false;
+const markers = {};
 const pinIcon = sp => L.divIcon({ className: '', iconSize: [0, 0], html: `<div class="pin ${state.spot === sp.id ? 'sel' : ''}"><div class="drop"></div><span class="cnt">${(stats[sp.id] || 0).toLocaleString('th-TH')}</span></div>` });
-function refreshMarkers() { if (!map) return; SPOTS.forEach(sp => markers[sp.id] && markers[sp.id].setIcon(pinIcon(sp))); }
+function refreshMarkers() { if (!map) return; Object.keys(markers).forEach(id => SPOT[id] && markers[id].setIcon(pinIcon(SPOT[id]))); }
+function addSpotMarker(sp) {
+  if (!map) return;
+  let marker = markers[sp.id];
+  if (!marker) {
+    marker = L.marker([sp.lat, sp.lng], { icon: pinIcon(sp), title: sp.name, keyboard: true, bubblingMouseEvents: false }).addTo(map);
+    const label = document.createElement('span'); label.textContent = sp.short;
+    marker.bindTooltip(label, { permanent: true, direction: 'bottom', offset: [0, 4], className: 'pinlabel' });
+    marker.on('click', () => selectSpot(sp.id, true));
+    markers[sp.id] = marker;
+  } else {
+    marker.setLatLng([sp.lat, sp.lng]); marker.setIcon(pinIcon(sp));
+  }
+}
 function enterMap() {
   if (!map) {
     if (!window.L) { toast('โหลดแผนที่ไม่สำเร็จ ลองเลือกจากรายการด้านล่าง'); }
     else {
       map = L.map('map', { zoomControl: true, worldCopyJump: false }).setView([15.6, 101.2], innerWidth < 700 ? 5 : 6);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors', maxZoom: 19 }).addTo(map);
-      SPOTS.forEach(sp => { const m = L.marker([sp.lat, sp.lng], { icon: pinIcon(sp), title: sp.name, keyboard: true }).addTo(map); m.bindTooltip(sp.short, { permanent: true, direction: 'bottom', offset: [0, 4], className: 'pinlabel' }); m.on('click', () => selectSpot(sp.id, true)); markers[sp.id] = m; });
+      SPOTS.forEach(addSpotMarker);
+      Object.values(CUSTOM_SPOTS).forEach(addSpotMarker);
+      map.on('click', event => { if (pinMode) pinManualSpot(event.latlng); });
     }
     renderSpotPicker();
   }
@@ -819,9 +887,15 @@ function renderSpotPicker() {
   chips.textContent = '';
   const suggestions = $('#provinceSuggestions');
   suggestions.textContent = '';
+  const provinceSelect = $('#customPlaceProvince');
+  provinceSelect.textContent = '';
+  const prompt = document.createElement('option'); prompt.value = ''; prompt.textContent = 'เลือกจังหวัด';
+  provinceSelect.append(prompt);
   PROVINCES.forEach(prov => {
     const option = document.createElement('option'); option.value = prov;
     suggestions.append(option);
+    const choice = document.createElement('option'); choice.value = prov; choice.textContent = prov;
+    provinceSelect.append(choice);
   });
   provinces.forEach(prov => {
     const b = document.createElement('button');
@@ -830,11 +904,16 @@ function renderSpotPicker() {
     chips.append(b);
   });
   $('#spotSearch').oninput = updateSpotPicker;
+  $('#spotSearch').onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); searchPlaces(); } };
+  $('#searchPlaces').onclick = searchPlaces;
+  $('#pinModeBtn').onclick = togglePinMode;
   updateSpotPicker();
 }
 function updateSpotPicker() {
   const query = $('#spotSearch').value.trim().toLocaleLowerCase('th-TH');
-  const results = SPOTS.filter(sp => !query || `${sp.prov} ${sp.name} ${sp.river} ${sp.blurb}`.toLocaleLowerCase('th-TH').includes(query));
+  const allSpots = [...SPOTS, ...Object.values(CUSTOM_SPOTS)];
+  const results = allSpots.filter((sp, index) => allSpots.findIndex(item => item.id === sp.id) === index)
+    .filter(sp => !query || `${sp.prov} ${sp.name} ${sp.river} ${sp.blurb}`.toLocaleLowerCase('th-TH').includes(query));
   const province = PROVINCES.find(prov => prov.toLocaleLowerCase('th-TH') === query);
   $$('#spotChips .chipbtn').forEach(b => b.classList.toggle('sel', !!query && query === b.dataset.prov.toLocaleLowerCase('th-TH')));
   const list = $('#spotResults');
@@ -842,22 +921,85 @@ function updateSpotPicker() {
   if (!results.length) {
     const empty = document.createElement('div'); empty.className = 'spot-empty';
     empty.textContent = province
-      ? `ค้นพบจังหวัด${province} แต่ยังไม่มีข้อมูลสถานที่เด่นให้เลือก`
-      : 'ไม่พบจังหวัดหรือสถานที่ ลองค้นหาชื่ออื่น';
+      ? `ยังไม่มีหมุดแนะนำในจังหวัด${province} กด “ค้นหา” เพื่อค้นหาวัด หรือปักหมุดบนแผนที่เอง`
+      : 'ไม่พบในรายการแนะนำ กด “ค้นหา” เพื่อค้นหาวัดทั่วไทย หรือปักหมุดบนแผนที่เอง';
     list.append(empty); return;
   }
   results.forEach(sp => {
     const b = document.createElement('button'); b.type = 'button';
     b.className = 'spot-option' + (state.spot === sp.id ? ' sel' : '');
-    b.innerHTML = `<b>${sp.name}</b><span>${sp.prov} · ${sp.river} · ลอยแล้ว ${(stats[sp.id] || 0).toLocaleString('th-TH')} ใบ</span>`;
+    const name = document.createElement('b'); name.textContent = sp.name;
+    const detail = document.createElement('span'); detail.textContent = `${sp.prov} · ${sp.river} · ลอยแล้ว ${(stats[sp.id] || 0).toLocaleString('th-TH')} ใบ`;
+    b.append(name, detail);
     b.setAttribute('aria-pressed', state.spot === sp.id ? 'true' : 'false');
     b.onclick = () => selectSpot(sp.id, true);
     list.append(b);
   });
   if (!query) $$('#spotChips .chipbtn').forEach(b => b.classList.remove('sel'));
 }
+function customSpotFromLocation(name, province, lat, lng, source) {
+  const id = customSpotId(lat, lng);
+  return registerCustomSpot({
+    id, name: name.slice(0, 80), short: name.slice(0, 28), prov: province,
+    blurb: `${source} · ภาพฉากเป็นภาพประกอบทั่วไป`,
+    lat, lng
+  });
+}
+async function searchPlaces() {
+  const query = $('#spotSearch').value.trim();
+  if (!query) return toast('พิมพ์ชื่อวัดหรือจังหวัดที่ต้องการค้นหา');
+  if (placeSearchBusy) return;
+  if (Date.now() - lastPlaceSearchAt < 1000) return toast('รอสักครู่ก่อนค้นหาสถานที่อีกครั้ง');
+  const button = $('#searchPlaces');
+  placeSearchBusy = true; lastPlaceSearchAt = Date.now(); button.disabled = true; button.textContent = 'กำลังค้นหา…';
+  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.search = new URLSearchParams({ q: query, format: 'jsonv2', addressdetails: '1', limit: '8', countrycodes: 'th' }).toString();
+    const response = await fetch(url, { headers: { 'Accept-Language': 'th,en' }, signal: controller.signal });
+    if (!response.ok) throw new Error(`OpenStreetMap search failed (${response.status})`);
+    const places = await response.json();
+    if (!Array.isArray(places)) throw new Error('OpenStreetMap returned an invalid response');
+    const found = [];
+    places.forEach(place => {
+      const lat = Number(place.lat), lng = Number(place.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !place.display_name) return;
+      const address = place.address || {};
+      const province = PROVINCES.find(p => `${place.display_name} ${query}`.includes(p))
+        || address.province || address.state || address.county || 'ไม่ระบุจังหวัด';
+      const name = String(place.name || place.display_name.split(',')[0]).slice(0, 80);
+      const spot = customSpotFromLocation(name, province, lat, lng, 'ค้นหาจาก OpenStreetMap');
+      if (spot && !found.some(item => item.id === spot.id)) found.push(spot);
+    });
+    if (!found.length) toast('ไม่พบผลลัพธ์ ลองคำค้นอื่นหรือปักหมุดเอง');
+    updateSpotPicker();
+  } catch (error) {
+    toast(error.name === 'AbortError' ? 'ค้นหาหมดเวลา ลองอีกครั้งหรือปักหมุดเอง' : 'ค้นหาสถานที่ไม่สำเร็จ ลองอีกครั้งหรือปักหมุดเอง');
+    console.error(error);
+  } finally {
+    clearTimeout(timeout); placeSearchBusy = false; button.disabled = false; button.textContent = 'ค้นหา';
+  }
+}
+function togglePinMode() {
+  if (!map) return toast('แผนที่ยังไม่พร้อม ลองโหลดหน้าใหม่');
+  if (!$('#customPlaceName').value.trim()) return toast('กรอกชื่อวัดหรือสถานที่ก่อน');
+  if (!$('#customPlaceProvince').value) return toast('เลือกจังหวัดก่อน');
+  pinMode = !pinMode;
+  $('#pinModeBtn').classList.toggle('active', pinMode);
+  $('#pinModeStatus').textContent = pinMode ? 'คลิกตำแหน่งวัดบนแผนที่เพื่อสร้างหมุด' : 'ค้นหาผ่าน OpenStreetMap หรือกรอกชื่อ แล้วคลิกตำแหน่งวัดบนแผนที่';
+  map.getContainer().style.cursor = pinMode ? 'crosshair' : '';
+}
+function pinManualSpot(latlng) {
+  const spot = customSpotFromLocation($('#customPlaceName').value.trim(), $('#customPlaceProvince').value, latlng.lat, latlng.lng, 'ปักหมุดโดยผู้ใช้');
+  if (!spot) return toast('ปักหมุดไม่สำเร็จ ลองเลือกตำแหน่งอีกครั้ง');
+  pinMode = false; $('#pinModeBtn').classList.remove('active'); map.getContainer().style.cursor = '';
+  $('#pinModeStatus').textContent = 'เพิ่มหมุดแล้ว เลือกสถานที่นี้เพื่อไปต่อได้เลย';
+  selectSpot(spot.id, false);
+}
 function selectSpot(id, fly) {
   state.spot = id; const sp = SPOT[id];
+  if (!sp) return toast('ไม่พบข้อมูลสถานที่นี้');
+  addSpotMarker(sp);
   refreshMarkers();
   updateSpotPicker();
   if (fly && map) map.flyTo([sp.lat, sp.lng], Math.max(map.getZoom(), 8), { duration: .8 });
@@ -1058,6 +1200,20 @@ const LM = {
     for (let i = 0; i < 24; i++) { const x = r() * w; g.beginPath(); g.ellipse(x, h - 14, 22 + r() * 24, 24 + r() * 28, 0, 0, 7); g.fill(); }
     for (let x = w * .05; x < w * .95; x += 62 + r() * 40) { const hw = 40 + r() * 20, hh = 18 + r() * 8; g.fillStyle = SIL; g.fillRect(x, h - hh - 4, hw, hh); roof(g, x + hw / 2, h - hh - 4, hw + 14, 16); g.fillStyle = 'rgba(255,190,70,.9)'; g.fillRect(x + 6, h - hh + 2, 7, 8); g.fillRect(x + hw - 14, h - hh + 2, 7, 8); }
     g.fillStyle = SIL; g.fillRect(0, h - 4, w, 4);
+  },
+  custom(g, w, h) {
+    ridge(g, w, h, .06, .08, .004, 2, '#0a1d4b');
+    g.fillStyle = SIL;
+    for (let i = 0; i < 6; i++) {
+      const x = w * (.08 + i * .17), bh = h * (.12 + (i % 3) * .035), bw = Math.max(24, h * .42);
+      g.fillRect(x, h - bh, bw, bh);
+      roof(g, x + bw / 2, h - bh, bw + 12, Math.max(12, h * .16));
+      g.fillStyle = 'rgba(255,190,70,.75)';
+      g.fillRect(x + bw * .25, h - bh * .6, 5, 7);
+      g.fillStyle = SIL;
+    }
+    g.fillRect(0, h - 5, w, 5);
+    lights(g, w * .08, w * .92, h * .68, h - 7, 24, 18);
   }
 };
 
@@ -1200,10 +1356,11 @@ async function boot() {
   const k = new URLSearchParams(location.search).get('k');
   if (k && sb && live && /^[0-9a-f-]{36}$/i.test(k)) {
     const { data } = await sb.from('krathongs').select('*').eq('id', k).maybeSingle();
-    if (data && SPOT[data.spot_id]) {
+    const linkedSpot = restoreCustomSpot(data);
+    if (data && linkedSpot) {
       Object.assign(state, { gender: data.gender, outfit: data.outfit, krathong: data.krathong, spot: data.spot_id, nick: data.nickname, wish: data.wish, id: data.id, saved: true });
-      setScene(SPOT[data.spot_id]); go('view');
-      $('#viewTitle').textContent = `กระทงของ ${data.nickname}`; $('#viewSub').textContent = `ลอยที่ ${SPOT[data.spot_id].name} · “${data.wish}”`;
+      setScene(linkedSpot); go('view');
+      $('#viewTitle').textContent = `กระทงของ ${data.nickname}`; $('#viewSub').textContent = `ลอยที่ ${linkedSpot.name} · “${data.wish}”`;
       me.img = kImg(data.krathong); me.state = 'parked';
       setTimeout(() => { Object.assign(me, { hx: W * .2, hy: H * .8, wx: W * .3, wy: H * .87, ex: W * (W < 700 ? .56 : .6), ey: horizon + (H - horizon) * .22 }); me.t = 13; }, 0);
       return;
