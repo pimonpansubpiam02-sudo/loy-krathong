@@ -42,10 +42,6 @@ button{font:inherit;color:inherit}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#46e08a;margin-right:6px;box-shadow:0 0 8px #46e08a;animation:pulse 1.6s infinite}
 .dot.demo{background:var(--gold);box-shadow:0 0 8px var(--gold)}
 @keyframes pulse{50%{opacity:.35}}
-#ticker{margin-top:6px;height:26px;overflow:hidden;border-radius:99px;background:rgba(8,20,54,.55);border:1px solid rgba(185,206,255,.12);font-size:12.5px;color:var(--b200);position:relative;mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-#tickerTrack{display:inline-flex;gap:38px;white-space:nowrap;padding-left:100%;line-height:26px;animation:marquee 70s linear infinite}
-#tickerTrack span b{color:var(--gold2);font-weight:500}
-@keyframes marquee{to{transform:translateX(-100%)}}
 @media (max-width:700px){.stepper{order:3;width:100%;justify-content:center;margin:4px 0 0}.stats .hide-m{display:none}}
 
 /* ---------- panel ---------- */
@@ -189,7 +185,6 @@ input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(25
     </div>
     <button class="chip music-toggle" id="musicToggle" type="button" aria-pressed="false">♪ เพลงอัตโนมัติ</button>
   </div>
-  <div id="ticker" aria-label="คำอวยพรล่าสุด"><div id="tickerTrack"></div></div>
 </header>
 
 <div id="avatarDock" aria-hidden="true"></div>
@@ -665,7 +660,7 @@ async function initData() {
     online = 3 + (Math.random() * 9 | 0);
     setInterval(() => { if (!document.hidden) onNew(demoRow()); }, 6500);
   }
-  renderStats(); renderTicker(); refreshMarkers(); updateSpotInfo(); rebuildFloaters();
+  renderStats(); refreshMarkers(); updateSpotInfo(); rebuildFloaters();
 }
 function onNew(row, own) {
   if (!row || seen.has(row.id)) return;
@@ -674,7 +669,7 @@ function onNew(row, own) {
   recent.unshift(row); if (recent.length > 60) recent.pop();
   stats[row.spot_id] = (stats[row.spot_id] || 0) + 1;
   if (!own) addFloater(row, true);
-  renderStats(); renderTicker(); refreshMarkers(); updateSpotInfo();
+  renderStats(); refreshMarkers(); updateSpotInfo();
 }
 function renderStats() {
   $('#totalCnt').textContent = totalCount().toLocaleString('th-TH');
@@ -682,14 +677,6 @@ function renderStats() {
   $('#onlineCnt').textContent = online;
   $('#liveTxt').textContent = live ? 'Live' : 'โหมดสาธิต';
   $('#liveDot').classList.toggle('demo', !live);
-}
-function renderTicker() {
-  const tr = $('#tickerTrack'); tr.textContent = '';
-  recent.slice(0, 14).forEach(r => {
-    const sp = document.createElement('span'), b = document.createElement('b');
-    b.textContent = r.nickname; sp.append('🏮 ', b, ` @${SPOT[r.spot_id] ? SPOT[r.spot_id].short : ''}: `, r.wish);
-    tr.append(sp);
-  });
 }
 async function saveKrathong() {
   const row = { id: genUUID(), nickname: state.nick, wish: state.wish, gender: state.gender, outfit: state.outfit, krathong: state.krathong, spot_id: state.spot };
@@ -1109,12 +1096,10 @@ function selectSpot(id, fly) {
 function updateSpotInfo() {
   const box = $('#spotInfo'); if (!box) return;
   const sp = state.spot && SPOT[state.spot]; if (!sp) return;
-  const last = recent.find(r => r.spot_id === sp.id);
   box.textContent = '';
   const l = document.createElement('div');
   l.innerHTML = `<div class="nm"></div><div class="bl"></div><div class="cn">ลอยแล้ว <b></b> ใบ</div>`;
   $('.nm', l).textContent = '📍 ' + sp.name + ' · ' + sp.prov; $('.bl', l).textContent = sp.blurb; $('.cn b', l).textContent = (stats[sp.id] || 0).toLocaleString('th-TH');
-  if (last) { const w = document.createElement('div'); w.className = 'cn'; w.textContent = `ล่าสุด: ${last.nickname} — “${last.wish}”`; l.append(w); }
   box.append(l);
 }
 $('#mapNext').onclick = () => { if (state.spot) go('scene'); };
