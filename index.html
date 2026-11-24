@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ลอยกระทงออนไลน์ · Loy Krathong Online</title>
+<meta name="description" content="เลือกชุด เลือกกระทง เลือกริมน้ำ แล้วปล่อยคำอวยพรให้ลอยไปกับสายน้ำ พร้อมคนอื่นๆ แบบเรียลไทม์">
+<meta property="og:title" content="ลอยกระทงออนไลน์ · Loy Krathong Online">
+<meta property="og:description" content="มาลอยกระทงพร้อมคำอวยพรด้วยกัน เห็นกระทงของทุกคนลอยแบบเรียลไทม์">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0a1a3f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --n950:#040b1f;--n900:#0a1a3f;--n800:#0f2656;--n700:#173a80;
+  --b600:#2457d6;--b400:#5b8cff;--b200:#b9ceff;
+  --gold:#ffc933;--gold2:#ffe08a;--cream:#fff6dc;
+  --glass:rgba(8,20,54,.74);--line:rgba(255,201,51,.28);--r:22px;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--n950);color:var(--cream);font-family:'Prompt',system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+/* ---------- top bar ---------- */
+.top{position:fixed;top:0;left:0;right:0;z-index:20;padding:calc(10px + env(safe-area-inset-top)) 16px 6px;background:linear-gradient(180deg,rgba(4,11,31,.9),rgba(4,11,31,0));pointer-events:none}
+.top .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top > *{pointer-events:auto}
+.brand{font-family:'Mitr';font-size:clamp(16px,2.4vw,22px);color:var(--gold);display:flex;gap:8px;align-items:center;white-space:nowrap;text-shadow:0 0 18px rgba(255,201,51,.45)}
+.stepper{display:flex;gap:6px;margin:0 auto}
+.stepper i{width:24px;height:6px;border-radius:6px;background:rgba(185,206,255,.22);transition:.4s}
+.stepper i.done{background:var(--b400)}
+.stepper i.on{background:var(--gold);width:40px;box-shadow:0 0 12px var(--gold)}
+.stats{display:flex;gap:8px;font-size:12.5px}
+.chip{padding:5px 11px;border-radius:99px;background:rgba(15,38,86,.78);border:1px solid var(--line);white-space:nowrap}
+.chip b{color:var(--gold);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#46e08a;margin-right:6px;box-shadow:0 0 8px #46e08a;animation:pulse 1.6s infinite}
+.dot.demo{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+@keyframes pulse{50%{opacity:.35}}
+#ticker{margin-top:6px;height:26px;overflow:hidden;border-radius:99px;background:rgba(8,20,54,.55);border:1px solid rgba(185,206,255,.12);font-size:12.5px;color:var(--b200);position:relative;mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+#tickerTrack{display:inline-flex;gap:38px;white-space:nowrap;padding-left:100%;line-height:26px;animation:marquee 70s linear infinite}
+#tickerTrack span b{color:var(--gold2);font-weight:500}
+@keyframes marquee{to{transform:translateX(-100%)}}
+@media (max-width:700px){.stepper{order:3;width:100%;justify-content:center;margin:4px 0 0}.stats .hide-m{display:none}}
+
+/* ---------- panel ---------- */
+.panel{position:fixed;z-index:25;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(760px,calc(100vw - 20px));max-height:calc(100dvh - 140px);overflow:auto;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:var(--r);padding:22px clamp(16px,3vw,28px);box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);transition:opacity .5s,bottom .4s}
+.panel.center{bottom:auto;top:calc(50% + 40px);transform:translate(-50%,-50%)}
+.panel.wide{width:min(1020px,calc(100vw - 16px))}
+.panel.compact{width:min(560px,calc(100vw - 20px));padding:16px 20px}
+.panel.hidden{opacity:0;pointer-events:none}
+.step{display:none}
+.step.on{display:block;animation:rise .55s both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+h1{font-family:'Mitr';font-weight:600;font-size:clamp(34px,7vw,58px);line-height:1.1;background:linear-gradient(180deg,#fff0b3,#ffc933 60%,#ff9d1a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 22px rgba(255,201,51,.35))}
+h2{font-family:'Mitr';font-weight:500;font-size:clamp(20px,3.6vw,28px);color:var(--gold2)}
+.sub{color:var(--b200);font-size:14.5px;margin:6px 0 16px;line-height:1.6}
+.eyebrow{font-size:13px;letter-spacing:.18em;color:var(--b400);text-transform:uppercase;margin-bottom:6px}
+.hero-stat{margin:6px 0 20px;color:var(--b200);font-size:15px}
+.hero-stat b{font-family:'Mitr';font-size:30px;color:var(--gold);margin-right:6px}
+
+.grid{display:grid;gap:12px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.gauto{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.card{cursor:pointer;border:1.5px solid rgba(185,206,255,.2);background:linear-gradient(180deg,rgba(23,58,128,.45),rgba(10,26,63,.6));border-radius:18px;padding:12px 8px 10px;text-align:center;transition:.25s;position:relative;overflow:hidden}
+.card:hover{transform:translateY(-3px);border-color:rgba(255,201,51,.6)}
+.card:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.card.sel{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,201,51,.25),0 10px 30px rgba(255,201,51,.18);background:linear-gradient(180deg,rgba(36,87,214,.6),rgba(10,26,63,.75))}
+.card.sel::after{content:'✓';position:absolute;top:8px;right:10px;width:22px;height:22px;border-radius:50%;background:var(--gold);color:#10265a;font-weight:700;font-size:13px;display:grid;place-items:center}
+.card svg{height:150px;width:auto;max-width:100%;display:block;margin:0 auto 6px}
+.card.k svg{height:92px}
+.card .t{font-weight:500;font-size:15px}
+.card .d{font-size:12px;color:var(--b200);margin-top:2px}
+.customizer{margin-top:14px;padding:14px;border:1px solid rgba(185,206,255,.18);border-radius:14px;background:rgba(15,38,86,.42)}
+.customizer h3{font:500 15px 'Mitr';color:var(--gold2);margin-bottom:8px}
+.custom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.custom-grid label{margin-bottom:4px}
+.custom-grid input[type=color]{height:40px;padding:4px;cursor:pointer}
+.photo-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.photo-row input[type=file]{font-size:13px;padding:8px}
+.photo-preview{width:58px;height:58px;object-fit:cover;border-radius:50%;border:2px solid var(--gold);display:none}
+.privacy-note{font-size:11.5px;color:var(--b200);margin-top:6px}
+.customizer .btn.sm{margin-top:8px}
+
+.btn{border:0;cursor:pointer;font:600 16px 'Prompt';padding:13px 28px;border-radius:99px;background:linear-gradient(180deg,#ffd95a,#ffb800);color:#10265a;box-shadow:0 8px 24px rgba(255,184,0,.35);transition:.2s}
+.btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 30px rgba(255,184,0,.5)}
+.btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.btn.ghost{background:transparent;color:var(--b200);border:1px solid rgba(185,206,255,.35);box-shadow:none}
+.btn.sm{padding:9px 18px;font-size:14px}
+.actions{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap}
+
+/* map */
+#map{height:min(44vh,420px);border-radius:16px;border:1px solid var(--line);overflow:hidden;background:#0a1a3f}
+.leaflet-tile{filter:invert(1) hue-rotate(195deg) saturate(1.5) brightness(.92) contrast(.95)}
+.leaflet-tooltip.pinlabel{background:rgba(8,20,54,.92);color:var(--gold2);border:1px solid var(--line);font:500 12px 'Prompt';padding:2px 9px;border-radius:99px;box-shadow:none}
+.leaflet-tooltip-bottom.pinlabel::before{display:none}
+.leaflet-container{font-family:'Prompt'}
+.leaflet-control-attribution{background:rgba(4,11,31,.7)!important;color:var(--b200)!important}
+.leaflet-control-attribution a{color:var(--gold2)!important}
+.leaflet-bar a{background:var(--n800)!important;color:var(--gold)!important;border-color:var(--n700)!important}
+.pin{position:relative;width:34px;height:34px;transform:translate(-50%,-100%);cursor:pointer}
+.pin .drop{position:absolute;inset:0;background:var(--gold);border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #10265a;box-shadow:0 6px 14px rgba(0,0,0,.55);transition:.25s}
+.pin .drop::after{content:'';position:absolute;inset:7px;border-radius:50%;background:#10265a}
+.pin .cnt{position:absolute;top:-9px;right:-14px;background:var(--b600);color:#fff;font:600 11px 'Prompt';padding:1px 7px;border-radius:99px;border:2px solid var(--cream);white-space:nowrap}
+.pin.sel .drop{background:#fff;box-shadow:0 0 0 6px rgba(255,201,51,.45),0 0 26px var(--gold);animation:hop 1s ease-in-out infinite}
+.pin.sel .drop::after{background:var(--b600)}
+@keyframes hop{50%{transform:rotate(-45deg) translate(-5px,5px)}}
+#spotInfo{margin-top:12px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;background:rgba(15,38,86,.6);border:1px solid rgba(185,206,255,.15);min-height:76px}
+#spotInfo .nm{font-family:'Mitr';font-size:17px;color:var(--gold2)}
+#spotInfo .bl{font-size:13px;color:var(--b200);margin-top:2px;line-height:1.5}
+#spotInfo .cn{font-size:12.5px;color:var(--b200);margin-top:4px}
+#spotInfo .cn b{color:var(--gold)}
+.spot-search{margin:12px 0 2px}
+.spot-search label{margin-bottom:6px}
+.spot-search input{font-size:14px}
+.spot-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;max-height:150px;overflow:auto;padding:2px}
+.spot-option{cursor:pointer;text-align:left;border:1px solid rgba(185,206,255,.2);background:rgba(15,38,86,.6);border-radius:12px;padding:9px 12px;color:var(--cream);transition:.2s}
+.spot-option:hover,.spot-option.sel{border-color:var(--gold);background:rgba(36,87,214,.55)}
+.spot-option b{display:block;color:var(--gold2);font-size:13px;font-weight:500}
+.spot-option span{display:block;color:var(--b200);font-size:11.5px;margin-top:2px}
+.spot-empty{grid-column:1/-1;color:var(--b200);font-size:13px;padding:8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
+.chipbtn{flex:none;cursor:pointer;border:1px solid rgba(185,206,255,.25);background:rgba(15,38,86,.6);border-radius:99px;padding:5px 13px;font-size:13px;color:var(--b200);transition:.2s}
+.chipbtn:hover,.chipbtn.sel{background:var(--gold);color:#10265a;border-color:var(--gold)}
+
+/* wish */
+.wishgrid{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
+.wishprev{display:flex;flex-direction:column;align-items:center;gap:6px}
+.wishprev svg{display:block}
+.wishprev .av{height:118px;width:auto}
+.wishprev .kr{height:66px;width:auto;animation:bob 3s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px) rotate(1.5deg)}}
+label{display:block;font-size:13px;color:var(--b200);margin:0 0 5px}
+input,textarea{width:100%;font:400 16px 'Prompt';color:var(--cream);background:rgba(4,11,31,.55);border:1.5px solid rgba(185,206,255,.28);border-radius:14px;padding:11px 14px;outline:none;transition:.2s;resize:none}
+input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,201,51,.2)}
+.cnt-l{font-size:12px;color:var(--b200);text-align:right;margin-top:3px}
+.field{margin-bottom:12px}
+@media (max-width:560px){.wishgrid{grid-template-columns:1fr}.wishprev{flex-direction:row;justify-content:center}.wishprev .av{height:80px}.wishprev .kr{height:46px}}
+
+/* share */
+.sharegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.sbtn{cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid rgba(185,206,255,.25);background:rgba(15,38,86,.7);border-radius:14px;padding:11px 8px;font-size:14px;transition:.2s;text-decoration:none;color:var(--cream)}
+.sbtn:hover{background:var(--n700);border-color:var(--gold);transform:translateY(-2px)}
+.sbtn i{font-style:normal;font-weight:700;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#fff}
+.sbtn.fb i{background:#1877f2}.sbtn.x i{background:#000;border:1px solid #444}.sbtn.line i{background:#06c755;font-size:8px}
+.sbtn.cp i,.sbtn.dl i,.sbtn.nat i{background:var(--gold);color:#10265a}
+.sbtn.primary{background:linear-gradient(180deg,#ffd95a,#ffb800);color:#10265a;font-weight:600;grid-column:1/-1;border:0}
+.sharewrap{display:grid;grid-template-columns:1fr;gap:14px}
+#cardPrev{display:none;width:150px;border-radius:12px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+@media (min-width:760px){.panel[data-share] .sharewrap{grid-template-columns:150px 1fr;align-items:start}.panel[data-share] #cardPrev{display:block}}
+@media (max-width:480px){.sharegrid{grid-template-columns:repeat(2,1fr)}}
+
+/* avatar dock */
+#avatarDock{position:fixed;z-index:12;left:clamp(10px,5vw,90px);bottom:0;height:min(36vh,330px);aspect-ratio:120/214;transform-origin:50% 100%;opacity:0;pointer-events:none;transition:opacity .6s,bottom .4s;animation:sway 4s ease-in-out infinite}
+#avatarDock.show{opacity:1}
+#avatarDock svg{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+#avatarDock.release{animation:lean 1.6s ease-in-out 1}
+@keyframes sway{50%{transform:scaleY(1.012) translateY(-1px)}}
+@keyframes lean{0%{transform:rotate(0)}40%{transform:rotate(8deg) translateX(8px)}100%{transform:rotate(0)}}
+@media (max-width:700px){#avatarDock{height:24vh}}
+
+#caption{position:fixed;z-index:18;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-family:'Mitr';font-size:clamp(18px,3.4vw,28px);color:var(--gold2);text-shadow:0 2px 20px rgba(0,0,0,.8),0 0 30px rgba(255,201,51,.4);opacity:0;transition:opacity 1s;pointer-events:none;width:min(90vw,720px)}
+#caption.on{opacity:1}
+#caption small{display:block;font:300 14px 'Prompt';color:var(--b200);margin-top:6px}
+#toast{position:fixed;z-index:60;left:50%;top:92px;transform:translate(-50%,-20px);background:var(--gold);color:#10265a;font-weight:500;padding:10px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:.4s;max-width:90vw;font-size:14px}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important}}
+</style>
+</head>
+<body data-step="intro">
+<canvas id="scene" aria-label="ภาพแม่น้ำยามค่ำคืนวันลอยกระทง"></canvas>
+
+<header class="top">
+  <div class="row">
+    <div class="brand">🏮 ลอยกระทงออนไลน์</div>
+    <div class="stepper" id="stepper" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="stats">
+      <span class="chip"><span class="dot" id="liveDot"></span><span id="liveTxt">Live</span> · ลอยแล้ว <b id="totalCnt">0</b> ใบ</span>
+      <span class="chip hide-m">ออนไลน์ <b id="onlineCnt">1</b> คน</span>
+    </div>
+  </div>
+  <div id="ticker" aria-label="คำอวยพรล่าสุด"><div id="tickerTrack"></div></div>
+</header>
+
+<div id="avatarDock" aria-hidden="true"></div>
+<div id="caption"></div>
+
+<main class="panel center" id="panel">
+  <!-- intro -->
+  <section class="step on" data-step="intro" style="text-align:center">
+    <div class="eyebrow">คืนเพ็ญเดือนสิบสอง</div>
+    <h1>ลอยกระทงออนไลน์</h1>
+    <p class="sub">เลือกชุด เลือกกระทง เลือกริมน้ำที่ใช่ แล้วปล่อยคำอวยพรให้ลอยไปกับสายน้ำ<br>พร้อมเห็นกระทงของทุกคนลอยอยู่ด้วยกันแบบเรียลไทม์</p>
+    <div class="hero-stat"><b id="heroCount">0</b> กระทงลอยอยู่บนสายน้ำแล้ว</div>
+    <button class="btn" id="startBtn">เริ่มลอยกระทง 🪷</button>
+  </section>
+
+  <!-- 1 gender -->
+  <section class="step" data-step="gender">
+    <h2>1 · คุณคือใคร?</h2>
+    <p class="sub">เลือกเพื่อกำหนดตัวละครของคุณ</p>
+    <div class="grid g3" id="genderGrid"></div>
+    <div class="actions"><button class="btn ghost sm" data-go="intro">← กลับ</button><button class="btn" id="genderNext" disabled>ต่อไป · เลือกชุด →</button></div>
+  </section>
+
+  <!-- 2 outfit -->
+  <section class="step" data-step="outfit">
+    <h2>2 · เลือกชุดสำหรับคืนนี้</h2>
+    <p class="sub">เลือกชุด อัปโหลดรูปตัวเอง หรือปรับสีตัวละครได้</p>
+    <div class="grid gauto" id="outfitGrid"></div>
+    <div class="customizer">
+      <h3>ปรับแต่งตัวละคร</h3>
+      <div class="photo-row">
+        <div><label for="profilePhoto">ใช้รูปตัวเองแทนใบหน้าการ์ตูน</label><input id="profilePhoto" type="file" accept="image/jpeg,image/png,image/webp"></div>
+        <img id="profilePreview" class="photo-preview" alt="ตัวอย่างรูปโปรไฟล์">
+        <button class="btn ghost sm" id="removePhoto" type="button" hidden>เอารูปออก</button>
+      </div>
+      <p class="privacy-note">รูปถูกย่อและไม่อัปโหลดไปยังเซิร์ฟเวอร์ การ์ดที่ดาวน์โหลดจะมีรูปนี้ ส่วนลิงก์ออนไลน์จะไม่มีรูป</p>
+      <div class="custom-grid" style="margin-top:10px">
+        <div><label for="avatarHairColor">สีผม</label><input id="avatarHairColor" type="color" value="#14193a"></div>
+        <div><label for="avatarSkinColor">สีผิว</label><input id="avatarSkinColor" type="color" value="#f3cfa6"></div>
+        <div><label for="avatarTopColor">สีเสื้อ</label><input id="avatarTopColor" type="color" value="#fff3c4"></div>
+        <div><label for="avatarBottomColor">สีท่อนล่าง</label><input id="avatarBottomColor" type="color" value="#1f4fd8"></div>
+        <div><label for="avatarPatternColor">สีลายชุด</label><input id="avatarPatternColor" type="color" value="#ffd95a"></div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn ghost sm" data-go="gender">← กลับ</button><button class="btn" id="outfitNext" disabled>ต่อไป · เลือกกระทง →</button></div>
+  </section>
+
+  <!-- 3 krathong -->
+  <section class="step" data-step="krathong">
+    <h2>3 · เลือกกระทงของคุณ</h2>
+    <p class="sub">เลือกจากกระทงดอกไม้และตัวการ์ตูนหลายแบบ แล้วปรับสีแมวเหมียวได้</p>
+    <div class="grid gauto" id="kGrid"></div>
+    <div class="customizer">
+      <h3>ออกแบบกระทงแมวเหมียว</h3>
+      <div class="custom-grid">
+        <div><label for="catFurColor">สีขน</label><input id="catFurColor" type="color" value="#f5e6cf"></div>
+        <div><label for="catFlowerColor">สีดอกไม้</label><input id="catFlowerColor" type="color" value="#f28cb3"></div>
+        <div><label for="catBaseColor">สีฐานกระทง</label><input id="catBaseColor" type="color" value="#3f9b6b"></div>
+      </div>
+      <p class="privacy-note">สีเหล่านี้ใช้กับกระทงแมวเหมียวที่วาดขึ้นใหม่</p>
+    </div>
+    <div class="actions"><button class="btn ghost sm" data-go="outfit">← กลับ</button><button class="btn" id="kNext" disabled>ต่อไป · เลือกสถานที่ →</button></div>
+  </section>
+
+  <!-- 4 map -->
+  <section class="step" data-step="map">
+    <h2>4 · ปักหมุดสถานที่ลอยกระทง</h2>
+    <p class="sub">ค้นหาจังหวัดหรือวัด แล้วเลือกจุดเด่นเพื่อปักหมุดลอยกระทง</p>
+    <div id="map"></div>
+    <div class="spot-search">
+      <label for="spotSearch">ค้นหาจังหวัดหรือสถานที่</label>
+      <input id="spotSearch" type="search" list="provinceSuggestions" placeholder="พิมพ์หรือเลือกจังหวัด เช่น เชียงใหม่" autocomplete="off">
+      <datalist id="provinceSuggestions"></datalist>
+    </div>
+    <div class="chips" id="spotChips"></div>
+    <div class="spot-results" id="spotResults" aria-live="polite"></div>
+    <div id="spotInfo"><div><div class="nm">ยังไม่ได้เลือกสถานที่</div><div class="bl">แตะหมุดบนแผนที่เพื่อดูรายละเอียด</div></div></div>
+    <div class="actions"><button class="btn ghost sm" data-go="krathong">← กลับ</button><button class="btn" id="mapNext" disabled>ไปยังริมน้ำ →</button></div>
+  </section>
+
+  <!-- 5 scene -->
+  <section class="step" data-step="scene">
+    <h2 id="sceneTitle">—</h2>
+    <p class="sub" id="sceneSub" style="margin-bottom:12px">—</p>
+    <div class="actions" style="margin-top:6px"><button class="btn ghost sm" data-go="map">← เปลี่ยนที่</button><button class="btn" id="sceneNext">เขียนคำอวยพร ✍️</button></div>
+  </section>
+
+  <!-- 6 wish -->
+  <section class="step" data-step="wish">
+    <h2>6 · ใส่คำอวยพรของคุณ</h2>
+    <p class="sub" id="wishSub" style="margin-bottom:12px">—</p>
+    <div class="wishgrid">
+      <div class="wishprev"><div class="av" id="wAv"></div><div id="wKr"></div></div>
+      <div>
+        <div class="field"><label for="nick">ชื่อเล่น</label><input id="nick" maxlength="20" placeholder="เช่น น้ำ, ก้อง, มะลิ" autocomplete="nickname"></div>
+        <div class="field"><label for="wish">คำอวยพร</label><textarea id="wish" rows="3" maxlength="120" placeholder="ขอให้…"></textarea><div class="cnt-l"><span id="wc">0</span>/120</div></div>
+        <div class="chips" id="wishChips" style="padding-top:0"></div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn ghost sm" data-go="scene">← กลับ</button><button class="btn" id="floatBtn" disabled>ลอยกระทง 🏮</button></div>
+  </section>
+
+  <!-- 7 float (panel hidden) -->
+  <section class="step" data-step="float"></section>
+
+  <!-- 8 share -->
+  <section class="step" data-step="share">
+    <h2>กระทงของคุณลอยไปแล้ว ✨</h2>
+    <p class="sub" id="shareSub" style="margin-bottom:4px">—</p>
+    <div class="sharewrap">
+      <img id="cardPrev" alt="การ์ดกระทงของคุณ">
+      <div>
+        <div class="sharegrid">
+          <button class="sbtn primary" id="shNative"><i>↗</i>แชร์เลย</button>
+          <a class="sbtn fb" id="shFb" target="_blank" rel="noopener"><i>f</i>Facebook</a>
+          <a class="sbtn x" id="shX" target="_blank" rel="noopener"><i>X</i>X / Twitter</a>
+          <a class="sbtn line" id="shLine" target="_blank" rel="noopener"><i>LINE</i>LINE</a>
+          <button class="sbtn cp" id="shCopy"><i>⧉</i>คัดลอกลิงก์</button>
+          <button class="sbtn dl" id="shDl"><i>↓</i>บันทึกภาพ</button>
+        </div>
+        <div class="actions" style="margin-top:14px"><button class="btn ghost sm" id="again">🪷 ลอยอีกใบ</button><span style="font-size:12px;color:var(--b200)">ขอบคุณที่มาลอยกระทงด้วยกัน</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- view (shared link) -->
+  <section class="step" data-step="view">
+    <h2 id="viewTitle">—</h2>
+    <p class="sub" id="viewSub" style="margin-bottom:12px">—</p>
+    <div class="actions" style="margin-top:6px"><span></span><button class="btn" id="viewCta">ลอยกระทงของฉันบ้าง 🪷</button></div>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* =====================================================================
+   ตั้งค่า Supabase  (รัน supabase_setup.sql ก่อน แล้วนำค่าจาก Project Settings → API มาใส่)
+   ถ้าเว้นว่าง เว็บจะทำงานใน "โหมดสาธิต" (ข้อมูลจำลองในเครื่อง ไม่ใช่เรียลไทม์จริง)
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://qxtzskkuqporevckqhlj.supabase.co',        // เช่น 'https://xxxxxxxx.supabase.co'
+  SUPABASE_ANON_KEY: 'sb_publishable_1trwObFt2b-lGuFmZ-LWTw_4SPX-hXI'    // anon public key
+};
+</script>
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let uid = 0;
+
+/* ========================= DATA ========================= */
+const GENDERS = [
+  { id: 'female', label: 'หญิง', d: 'ชุดไทยสุดสง่า' },
+  { id: 'male',   label: 'ชาย',  d: 'ชุดไทยสุดเท่' },
+  { id: 'other',  label: 'ไม่ระบุ', d: 'เลือกได้ทุกชุด' }
+];
+const OUTFITS = {
+  f_sabai:   { g: 'f', name: 'ชุดไทยสไบเฉียง', d: 'สไบทองพาดไหล่', top: '#fff3c4', bottom: '#1f4fd8', sash: '#ffc933', pat: '#ffd95a', skirt: 1, deco: 'sabai' },
+  f_lace:    { g: 'f', name: 'ชุดลูกไม้ประยุกต์', d: 'ลูกไม้ขาว ซิ่นน้ำเงิน', top: '#ffffff', bottom: '#12307a', pat: '#ffc933', skirt: 1, deco: 'lace' },
+  f_silk:    { g: 'f', name: 'ผ้าไหมไทย', d: 'เหลืองทองสดใส', top: '#ffd45a', bottom: '#2b57c9', pat: '#fff6dc', skirt: 1, deco: 'silk' },
+  m_ratcha:  { g: 'm', name: 'ชุดราชปะแตน', d: 'สง่างามแบบไทย', top: '#f7f3e6', bottom: '#1b3b8f', pat: '#ffc933', deco: 'button' },
+  m_mohom:   { g: 'm', name: 'เสื้อม่อฮ่อม', d: 'ครามเรียบเท่', top: '#23469b', bottom: '#1a2c66', pat: '#b9ceff', deco: 'pocket' },
+  m_pattern: { g: 'm', name: 'เสื้อลายไทย', d: 'เหลืองทองลายไทย', top: '#ffc933', bottom: '#0f2656', pat: '#fff6dc', deco: 'diamond' }
+};
+const KRATHONGS = {
+  lotus:     { name: 'กระทงดอกบัว', d: 'ดอกบัวบานสีทอง' },
+  banana:    { name: 'กระทงใบตอง', d: 'ดั้งเดิม ดอกดาวเรือง' },
+  butterfly: { name: 'กระทงอัญชัน', d: 'ดอกอัญชันสีน้ำเงิน' },
+  bread:     { name: 'กระทงขนมปัง', d: 'รักษ์โลก ปลาได้กิน' },
+  coconut:   { name: 'กระทงกะลา', d: 'กะลามะพร้าวธรรมชาติ' },
+  cat:       { name: 'กระทงแมวเหมียว', d: 'ลายแมวต้นฉบับ ปรับสีได้' },
+  rabbit:    { name: 'กระทงกระต่ายจันทร์', d: 'กระต่ายหูยาวในสวนดอกไม้' },
+  frog:      { name: 'กระทงกบน้อย', d: 'กบเขียวหน้ายิ้มบนใบบัว' },
+  turtle:    { name: 'กระทงเต่าทะเล', d: 'เต่าน้อยกับเปลือกสีสด' },
+  dragon:    { name: 'กระทงมังกรน้อย', d: 'มังกรแฟนตาซีสีฟ้าคราม' }
+};
+const DEFAULT_CAT_DESIGN = { fur: '#f5e6cf', flower: '#f28cb3', base: '#3f9b6b' };
+const SPOTS = [
+  { id: 'bkk', name: 'วัดอรุณฯ · เจ้าพระยา', short: 'กรุงเทพฯ', prov: 'กรุงเทพมหานคร', river: 'แม่น้ำเจ้าพระยา', lat: 13.7437, lng: 100.4889, scene: 'arun', moon: [.2, .3],
+    blurb: 'พระปรางค์วัดอรุณฯ สะท้อนบนสายน้ำเจ้าพระยา เรือหางยาวและแสงไฟสองฝั่งน้ำ' },
+  { id: 'cnx', name: 'สะพานนวรัฐ · แม่น้ำปิง', short: 'เชียงใหม่', prov: 'เชียงใหม่', river: 'แม่น้ำปิง', lat: 18.7925, lng: 99.0050, scene: 'mountain', moon: [.72, .26],
+    blurb: 'ยี่เป็งล้านนา โคมลอยเต็มฟ้า พระธาตุดอยสุเทพทอแสงอยู่บนเขาไกลๆ' },
+  { id: 'ayt', name: 'วัดไชยวัฒนาราม · อยุธยา', short: 'อยุธยา', prov: 'พระนครศรีอยุธยา', river: 'แม่น้ำเจ้าพระยา', lat: 14.3435, lng: 100.5420, scene: 'prang', moon: [.24, .28],
+    blurb: 'ปรางค์โบราณริมน้ำเมืองกรุงเก่า ใต้แสงจันทร์เพ็ญที่ส่องซากอารยธรรมเก่าแก่' },
+  { id: 'sukhothai', name: 'วัดตระพังเงิน · สุโขทัย', short: 'สุโขทัย', prov: 'สุโขทัย', river: 'ตระพังเงิน (สระน้ำเมืองเก่า)', lat: 17.0166, lng: 99.7012, scene: 'chedi', moon: [.78, .3],
+    blurb: 'ต้นกำเนิดประเพณีลอยกระทง เจดีย์ทรงพุ่มข้าวบิณฑ์ท่ามกลางสระน้ำเมืองเก่า' },
+  { id: 'kwai', name: 'สะพานข้ามแม่น้ำแคว', short: 'กาญจนบุรี', prov: 'กาญจนบุรี', river: 'แม่น้ำแคว', lat: 14.0409, lng: 99.5037, scene: 'bridge', moon: [.18, .25],
+    blurb: 'สะพานเหล็กทอดข้ามแม่น้ำแควใต้ขุนเขา บรรยากาศสงบเงียบยามค่ำ' },
+  { id: 'ubon', name: 'ริมแม่น้ำมูล · อุบลฯ', short: 'อุบลราชธานี', prov: 'อุบลราชธานี', river: 'แม่น้ำมูล', lat: 15.2236, lng: 104.8713, scene: 'palms', moon: [.7, .27],
+    blurb: 'วัดริมน้ำและแนวต้นตาล แม่น้ำมูลไหลเอื่อยใต้แสงจันทร์อีสาน' },
+  { id: 'nongkhai', name: 'ริมโขง · หนองคาย', short: 'หนองคาย', prov: 'หนองคาย', river: 'แม่น้ำโขง', lat: 17.8790, lng: 102.7390, scene: 'naga', moon: [.3, .27],
+    blurb: 'แม่น้ำโขงกว้างใหญ่ ลูกไฟพญานาคพวยพุ่งขึ้นจากผืนน้ำ ฝั่งลาวอยู่ไกลลิบ' },
+  { id: 'phitsanulok', name: 'บ้านแพ · แม่น้ำน่าน', short: 'พิษณุโลก', prov: 'พิษณุโลก', river: 'แม่น้ำน่าน', lat: 16.8236, lng: 100.2625, scene: 'houseboat', moon: [.76, .28],
+    blurb: 'เรือนแพริมแม่น้ำน่าน แสงไฟส้มทองสะท้อนผิวน้ำ วิถีชีวิตริมน้ำที่งดงาม' },
+  { id: 'bkk-watpho', name: 'วัดโพธิ์ · กรุงเทพฯ', short: 'กรุงเทพฯ', prov: 'กรุงเทพมหานคร', river: 'แม่น้ำเจ้าพระยา', lat: 13.7465, lng: 100.4927, scene: 'arun', moon: [.2, .3],
+    blurb: 'วัดพระเชตุพนฯ หรือวัดโพธิ์ แลนด์มาร์กสำคัญใกล้แม่น้ำเจ้าพระยาและพระบรมมหาราชวัง' },
+  { id: 'cnx-chediluang', name: 'วัดเจดีย์หลวง · เชียงใหม่', short: 'เชียงใหม่', prov: 'เชียงใหม่', river: 'แม่น้ำปิง', lat: 18.7883, lng: 98.9853, scene: 'mountain', moon: [.72, .26],
+    blurb: 'เจดีย์หลวงกลางเมืองเก่าเชียงใหม่ โบราณสถานสำคัญท่ามกลางบรรยากาศล้านนา' },
+  { id: 'ayt-mahathat', name: 'วัดมหาธาตุ · อยุธยา', short: 'อยุธยา', prov: 'พระนครศรีอยุธยา', river: 'แม่น้ำเจ้าพระยา', lat: 14.3567, lng: 100.5684, scene: 'prang', moon: [.24, .28],
+    blurb: 'ชมเศียรพระพุทธรูปในรากโพธิ์และโบราณสถานใจกลางอุทยานประวัติศาสตร์อยุธยา' },
+  { id: 'sukhothai-sichum', name: 'วัดศรีชุม · สุโขทัย', short: 'สุโขทัย', prov: 'สุโขทัย', river: 'ตระพังเงิน (สระน้ำเมืองเก่า)', lat: 17.0207, lng: 99.6977, scene: 'chedi', moon: [.78, .3],
+    blurb: 'วัดศรีชุมและพระอจนะ พระพุทธรูปองค์ใหญ่ในมณฑปแห่งอุทยานประวัติศาสตร์สุโขทัย' },
+  { id: 'nongkhai-phochai', name: 'วัดโพธิ์ชัย · หนองคาย', short: 'หนองคาย', prov: 'หนองคาย', river: 'แม่น้ำโขง', lat: 17.8788, lng: 102.7392, scene: 'naga', moon: [.3, .27],
+    blurb: 'วัดสำคัญคู่เมืองหนองคาย เป็นที่ประดิษฐานหลวงพ่อพระใส ใกล้ย่านริมแม่น้ำโขง' },
+  { id: 'phitsanulok-phrasri', name: 'วัดพระศรีรัตนมหาธาตุ · พิษณุโลก', short: 'พิษณุโลก', prov: 'พิษณุโลก', river: 'แม่น้ำน่าน', lat: 16.8228, lng: 100.2586, scene: 'houseboat', moon: [.76, .28],
+    blurb: 'วัดใหญ่ริมแม่น้ำน่าน โดดเด่นด้วยพระพุทธชินราชและสถาปัตยกรรมเก่าแก่' }
+];
+const PROVINCES = [
+  'กระบี่', 'กรุงเทพมหานคร', 'กาญจนบุรี', 'กาฬสินธุ์', 'กำแพงเพชร', 'ขอนแก่น', 'จันทบุรี', 'ฉะเชิงเทรา', 'ชลบุรี', 'ชัยนาท',
+  'ชัยภูมิ', 'ชุมพร', 'เชียงราย', 'เชียงใหม่', 'ตรัง', 'ตราด', 'ตาก', 'นครนายก', 'นครปฐม', 'นครพนม',
+  'นครราชสีมา', 'นครศรีธรรมราช', 'นครสวรรค์', 'นนทบุรี', 'นราธิวาส', 'น่าน', 'บึงกาฬ', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์',
+  'ปราจีนบุรี', 'ปัตตานี', 'พะเยา', 'พระนครศรีอยุธยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 'เพชรบุรี', 'เพชรบูรณ์',
+  'แพร่', 'ภูเก็ต', 'มหาสารคาม', 'มุกดาหาร', 'แม่ฮ่องสอน', 'ยโสธร', 'ยะลา', 'ร้อยเอ็ด', 'ระนอง', 'ระยอง',
+  'ราชบุรี', 'ลพบุรี', 'ลำปาง', 'ลำพูน', 'เลย', 'ศรีสะเกษ', 'สกลนคร', 'สงขลา', 'สตูล', 'สมุทรปราการ',
+  'สมุทรสงคราม', 'สมุทรสาคร', 'สระแก้ว', 'สระบุรี', 'สิงห์บุรี', 'สุโขทัย', 'สุพรรณบุรี', 'สุราษฎร์ธานี', 'สุรินทร์', 'หนองคาย',
+  'หนองบัวลำภู', 'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี', 'อุตรดิตถ์', 'อุทัยธานี', 'อุบลราชธานี'
+];
+const SPOT = Object.fromEntries(SPOTS.map(s => [s.id, s]));
+const WISH_IDEAS = ['ขอให้สุขภาพแข็งแรง', 'ขอให้ครอบครัวมีความสุข', 'ขอให้รักสมหวัง', 'ขอให้การงานก้าวหน้า', 'ขอให้เงินทองไหลมาเทมา', 'ขอบคุณแม่น้ำ ขออภัยที่ทำให้สกปรก', 'ขอให้ทุกคนที่รักปลอดภัย'];
+
+/* ========================= SVG: AVATAR ========================= */
+function avatarSVG(g, oid, img, design = state.customAvatar, photo = state.profileImage) {
+  const o = OUTFITS[oid] || OUTFITS.f_sabai, G = '#ffc933';
+  const S = design?.skin || '#f3cfa6', H = design?.hair || '#14193a';
+  const topColor = design?.top || o.top, bottomColor = design?.bottom || o.bottom, patternColor = design?.pattern || o.pat;
+  const fem = g === 'female', mas = g === 'male';
+  let s = `<svg viewBox="0 0 120 214" xmlns="http://www.w3.org/2000/svg" ${img ? 'width="120" height="214"' : ''}>`;
+  s += `<ellipse cx="60" cy="207" rx="38" ry="5" fill="rgba(0,0,0,.35)"/>`;
+  if (!fem && !mas) s += `<path d="M36 46 Q32 20 60 18 Q88 20 84 46 L84 64 Q60 68 36 64Z" fill="${H}"/>`;
+  // bottom
+  if (o.skirt) {
+    s += `<path d="M32 122 L88 122 L99 198 L21 198Z" fill="${bottomColor}"/><path d="M21 187 L99 187 L99.6 198 L20.4 198Z" fill="${patternColor}" opacity=".9"/>`;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { const y = 140 + r * 15, x = 36 + c * 12 + (r % 2 ? 6 : 0) - r * 1.2; s += `<path d="M${x} ${y - 4} l3 4 -3 4 -3 -4z" fill="${patternColor}" opacity=".7"/>`; }
+    s += `<ellipse cx="45" cy="202" rx="9" ry="4" fill="#fff6dc"/><ellipse cx="75" cy="202" rx="9" ry="4" fill="#fff6dc"/>`;
+  } else {
+    s += `<rect x="36" y="122" width="22" height="78" rx="8" fill="${bottomColor}"/><rect x="62" y="122" width="22" height="78" rx="8" fill="${bottomColor}"/>`;
+    s += `<ellipse cx="46" cy="202" rx="12" ry="5" fill="#0b1330"/><ellipse cx="74" cy="202" rx="12" ry="5" fill="#0b1330"/>`;
+  }
+  // arms + hands (behind torso edge)
+  s += `<path d="M34 80 Q21 102 25 126" stroke="${topColor}" stroke-width="13" stroke-linecap="round" fill="none"/>`;
+  s += `<path d="M86 80 Q99 102 95 126" stroke="${topColor}" stroke-width="13" stroke-linecap="round" fill="none"/>`;
+  s += `<circle cx="25" cy="132" r="6.5" fill="${S}"/><circle cx="95" cy="132" r="6.5" fill="${S}"/>`;
+  // torso
+  s += `<path d="M34 76 Q60 66 86 76 L92 128 Q60 134 28 128Z" fill="${topColor}"/>`;
+  if (o.skirt) s += `<rect x="29" y="120" width="62" height="8" rx="3" fill="${G}"/>`;
+  else s += `<rect x="31" y="120" width="58" height="7" rx="3" fill="${o.deco === 'button' ? G : '#0b1330'}" opacity=".95"/>`;
+  if (o.sash) { s += `<path d="M36 74 L54 71 L94 124 L72 132Z" fill="${o.sash}"/><path d="M54 71 L94 124" stroke="#fff6dc" stroke-width="2" opacity=".7"/><path d="M36 74 L72 132" stroke="#e29a00" stroke-width="1.5" opacity=".6"/>`; }
+  if (o.deco === 'lace') { s += `<path d="M42 74 Q60 94 78 74" stroke="${G}" stroke-width="2" fill="none"/>`; for (let i = 0; i < 6; i++) s += `<circle cx="${46 + i * 5.6}" cy="${82 + Math.sin(i / 5 * Math.PI) * 8}" r="1.6" fill="${G}"/>`; for (let i = 0; i < 8; i++) s += `<circle cx="${40 + i * 5.5}" cy="${108 + (i % 2) * 6}" r="1.4" fill="${G}" opacity=".8"/>`; }
+  if (o.deco === 'silk') { for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) s += `<path d="M${38 + c * 11 + (r % 2) * 5} ${88 + r * 10} l2.5 3 -2.5 3 -2.5 -3z" fill="${patternColor}" opacity=".8"/>`; }
+  if (o.deco === 'button') { s += `<path d="M50 72 L60 82 L70 72" stroke="#cfc6a8" stroke-width="2" fill="none"/>`; for (let i = 0; i < 4; i++) s += `<circle cx="60" cy="${88 + i * 10}" r="2.2" fill="${G}"/>`; }
+  if (o.deco === 'pocket') { s += `<rect x="38" y="104" width="15" height="13" rx="2" fill="none" stroke="${patternColor}" stroke-width="1.4" opacity=".8"/><rect x="67" y="104" width="15" height="13" rx="2" fill="none" stroke="${patternColor}" stroke-width="1.4" opacity=".8"/><path d="M60 78 V120" stroke="${patternColor}" stroke-width="1.4" opacity=".6"/>`; }
+  if (o.deco === 'diamond') { for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) s += `<path d="M${38 + c * 11 + (r % 2) * 5} ${88 + r * 10} l3 4 -3 4 -3 -4z" fill="${patternColor}" opacity=".85"/>`; }
+  // neck, head
+  s += `<rect x="53" y="60" width="14" height="18" fill="${S}"/>`;
+  if (photo) {
+    const faceId = `face${++uid}`;
+    s += `<defs><clipPath id="${faceId}"><circle cx="60" cy="44" r="22"/></clipPath></defs>`;
+    s += `<image href="${photo}" x="38" y="22" width="44" height="44" preserveAspectRatio="xMidYMid slice" clip-path="url(#${faceId})"/>`;
+  } else {
+    s += `<circle cx="38" cy="47" r="4" fill="${S}"/><circle cx="82" cy="47" r="4" fill="${S}"/><circle cx="60" cy="44" r="22" fill="${S}"/>`;
+    if (fem) {
+      s += `<path d="M37 46 Q36 20 60 19 Q84 20 83 46 Q76 30 60 30 Q44 30 37 46Z" fill="${H}"/><circle cx="60" cy="12" r="10" fill="${H}"/>`;
+      s += `<circle cx="51" cy="14" r="2.8" fill="#fff6dc"/><circle cx="57" cy="9" r="2.8" fill="#fff6dc"/><circle cx="64" cy="9" r="2.8" fill="#fff6dc"/><circle cx="70" cy="14" r="2.8" fill="#fff6dc"/><circle cx="60" cy="13" r="2.4" fill="${G}"/>`;
+    } else if (mas) {
+      s += `<path d="M37 45 Q33 17 60 17 Q87 17 83 45 Q80 31 60 28 Q40 31 37 45Z" fill="${H}"/>`;
+    } else {
+      s += `<path d="M38 42 Q40 22 60 22 Q80 22 82 42 Q70 33 60 33 Q50 33 38 42Z" fill="${H}"/><circle cx="72" cy="26" r="3" fill="${G}"/>`;
+    }
+    s += `<ellipse cx="51" cy="47" rx="2.4" ry="3.1" fill="#1b1f3a"/><ellipse cx="69" cy="47" rx="2.4" ry="3.1" fill="#1b1f3a"/>`;
+    s += `<circle cx="45" cy="54" r="4" fill="rgba(255,110,110,.25)"/><circle cx="75" cy="54" r="4" fill="rgba(255,110,110,.25)"/>`;
+    s += `<path d="M53 56 Q60 62 67 56" stroke="#b5544a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  }
+  return s + '</svg>';
+}
+
+/* ========================= SVG: KRATHONG ========================= */
+function petal(cx, cy, len, w, fill, stroke, a) {
+  return `<g transform="rotate(${a} ${cx} ${cy})"><path d="M${cx} ${cy} C${cx - w} ${cy - len * .35} ${cx - w * .7} ${cy - len} ${cx} ${cy - len} C${cx + w * .7} ${cy - len} ${cx + w} ${cy - len * .35} ${cx} ${cy}Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/></g>`;
+}
+function flower(cx, cy, r, n, pc, cc) {
+  let s = '';
+  for (let i = 0; i < n; i++) s += `<ellipse cx="${cx}" cy="${cy - r * .62}" rx="${r * .38}" ry="${r * .62}" fill="${pc}" stroke="rgba(0,0,0,.14)" stroke-width=".6" transform="rotate(${i * 360 / n} ${cx} ${cy})"/>`;
+  return s + `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="${cc}"/>`;
+}
+function candle(x, y, id) {
+  return `<circle cx="${x}" cy="${y - 52}" r="22" fill="url(#${id})"/><rect x="${x - 5}" y="${y - 38}" width="10" height="38" rx="2" fill="#fff3d0"/><rect x="${x - 5}" y="${y - 38}" width="10" height="5" fill="#ffe08a"/>`
+    + `<path class="flame" d="M${x} ${y - 60} C${x + 8} ${y - 49} ${x + 5} ${y - 40} ${x} ${y - 39} C${x - 5} ${y - 40} ${x - 8} ${y - 49} ${x} ${y - 60}Z" fill="#ffb800"/><path d="M${x} ${y - 53} C${x + 3} ${y - 47} ${x + 2} ${y - 42} ${x} ${y - 42} C${x - 2} ${y - 42} ${x - 3} ${y - 47} ${x} ${y - 53}Z" fill="#fff6c8"/>`;
+}
+function incense(x, y) {
+  return [-22, 0, 22].map(a => `<g transform="rotate(${a} ${x} ${y})"><line x1="${x}" y1="${y}" x2="${x}" y2="${y - 50}" stroke="#8a5a2b" stroke-width="2"/><circle cx="${x}" cy="${y - 50}" r="2.2" fill="#ff5a3c"/></g>`).join('');
+}
+function krathongSVG(type, design = null) {
+  const id = 'gl' + (++uid);
+  const catDesign = { ...DEFAULT_CAT_DESIGN, ...(design || {}) };
+  let s = `<svg viewBox="0 0 200 150" width="200" height="150" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}"><stop offset="0" stop-color="#ffd95a" stop-opacity=".75"/><stop offset="1" stop-color="#ffd95a" stop-opacity="0"/></radialGradient></defs>`;
+  s += `<ellipse cx="100" cy="128" rx="88" ry="11" fill="rgba(0,0,0,.28)"/>`;
+  if (type === 'banana') {
+    const leaves = front => { let t = ''; for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, sy = Math.sin(a); if ((sy > 0) !== front) continue; const x = 100 + Math.cos(a) * 70, y = 108 + sy * 20; t += `<path d="M${x - 9} ${y} Q${x} ${y - 36} ${x + 9} ${y}Z" fill="${i % 2 ? '#3fae5f' : '#2f9150'}" stroke="#1a5a30" stroke-width=".8" transform="rotate(${Math.cos(a) * -18} ${x} ${y})"/>`; } return t; };
+    s += `<ellipse cx="100" cy="108" rx="80" ry="24" fill="#1f6b3a"/>` + leaves(false) + `<ellipse cx="100" cy="104" rx="62" ry="17" fill="#4cbf6e"/>` + leaves(true);
+    s += incense(100, 104) + candle(100, 104, id);
+    s += flower(56, 104, 12, 10, '#ffc933', '#e8890b') + flower(144, 104, 12, 10, '#ffc933', '#e8890b') + flower(100, 118, 14, 10, '#ffd95a', '#e8890b') + flower(76, 112, 9, 8, '#5b8cff', '#ffe08a') + flower(126, 112, 9, 8, '#5b8cff', '#ffe08a');
+  } else if (type === 'lotus') {
+    s += `<ellipse cx="100" cy="112" rx="78" ry="16" fill="#1f6b3a"/><ellipse cx="100" cy="110" rx="60" ry="11" fill="#3fae5f"/>`;
+    [-78, -52, -26, 26, 52, 78].forEach(a => s += petal(100, 112, 62, 22, '#fff6dc', '#e2bd62', a));
+    [-62, -36, -10, 10, 36, 62].forEach(a => s += petal(100, 112, 54, 20, '#ffe08a', '#d9a21b', a));
+    s += incense(100, 106) + candle(100, 108, id);
+    [-40, -14, 14, 40].forEach(a => s += petal(100, 112, 40, 15, '#ffc933', '#c98a00', a));
+  } else if (type === 'butterfly') {
+    s += `<ellipse cx="100" cy="112" rx="80" ry="18" fill="#174d3a"/><ellipse cx="100" cy="109" rx="64" ry="12" fill="#2f9a62"/>`;
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, x = 100 + Math.cos(a) * 66, y = 110 + Math.sin(a) * 12; s += `<ellipse cx="${x}" cy="${y}" rx="9" ry="5" fill="#2f9a62" transform="rotate(${a * 57.3} ${x} ${y})"/>`; }
+    s += incense(100, 104) + candle(100, 104, id);
+    s += flower(54, 108, 15, 5, '#2457d6', '#ffe08a') + flower(146, 108, 15, 5, '#2457d6', '#ffe08a') + flower(80, 118, 14, 5, '#5b8cff', '#ffc933') + flower(122, 118, 14, 5, '#5b8cff', '#ffc933') + flower(100, 124, 11, 5, '#2457d6', '#ffe08a') + flower(34, 114, 9, 5, '#5b8cff', '#ffe08a') + flower(166, 114, 9, 5, '#5b8cff', '#ffe08a');
+  } else if (type === 'bread') {
+    s += `<ellipse cx="100" cy="108" rx="80" ry="22" fill="#b87a36"/><ellipse cx="100" cy="103" rx="76" ry="20" fill="#e8c28a"/><ellipse cx="100" cy="102" rx="60" ry="14" fill="#f3d9a8"/>`;
+    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; s += `<circle cx="${100 + Math.cos(a) * 74}" cy="${103 + Math.sin(a) * 19}" r="3" fill="#c98f4a"/>`; }
+    s += incense(100, 100) + candle(100, 100, id);
+    s += flower(60, 106, 11, 10, '#ffc933', '#e8890b') + flower(140, 106, 11, 10, '#ffc933', '#e8890b') + flower(100, 116, 12, 5, '#2457d6', '#ffe08a') + flower(78, 112, 8, 5, '#5b8cff', '#ffe08a') + flower(124, 112, 8, 5, '#5b8cff', '#ffe08a');
+    s += `<path d="M34 100 q6 -12 14 -2 q-8 6 -14 2z M152 100 q6 -12 14 -2 q-8 6 -14 2z" fill="#3fae5f"/>`;
+  } else if (type === 'cat') {
+    s += `<ellipse cx="100" cy="116" rx="80" ry="20" fill="${catDesign.base}"/><ellipse cx="100" cy="111" rx="64" ry="13" fill="#ffffff" opacity=".22"/>`;
+    s += flower(43, 109, 10, 6, catDesign.flower, '#ffe08a') + flower(157, 109, 10, 6, catDesign.flower, '#ffe08a');
+    s += `<path d="M66 54 L61 32 Q60 26 66 30 L82 43 Q100 35 118 43 L134 30 Q140 27 139 33 L134 55 Q143 67 138 84 Q132 106 100 108 Q68 106 62 84 Q57 67 66 54Z" fill="${catDesign.fur}" stroke="#735d58" stroke-width="2"/>`;
+    s += `<path d="M69 51 L67 37 L79 47Z M131 51 L133 37 L121 47Z" fill="${catDesign.flower}" opacity=".72"/>`;
+    s += `<path d="M78 53 Q87 47 94 52 M106 52 Q113 47 122 53" fill="none" stroke="#a9785c" stroke-width="3" stroke-linecap="round"/>`;
+    s += `<ellipse cx="84" cy="65" rx="3.2" ry="4.3" fill="#26354a"/><ellipse cx="116" cy="65" rx="3.2" ry="4.3" fill="#26354a"/>`;
+    s += `<path d="M97 73 Q100 70 103 73 L100 77Z" fill="${catDesign.flower}"/><path d="M100 77 Q95 83 90 79 M100 77 Q105 83 110 79" fill="none" stroke="#735d58" stroke-width="1.8" stroke-linecap="round"/>`;
+    s += `<path d="M78 73 L61 70 M78 79 L60 81 M122 73 L139 70 M122 79 L140 81" stroke="#735d58" stroke-width="1.6" stroke-linecap="round"/>`;
+    s += `<path d="M88 43 Q91 48 94 49 M112 43 Q109 48 106 49" stroke="#a9785c" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    s += candle(163, 113, id);
+  } else if (type === 'rabbit') {
+    s += `<ellipse cx="100" cy="117" rx="80" ry="20" fill="#6a9c62"/><ellipse cx="100" cy="112" rx="64" ry="13" fill="#a5ce79"/>`;
+    s += flower(48, 109, 10, 6, '#f28cb3', '#ffe08a') + flower(152, 109, 10, 6, '#f28cb3', '#ffe08a');
+    s += `<ellipse cx="83" cy="49" rx="11" ry="31" fill="#fff1e8" stroke="#b88d86" stroke-width="2" transform="rotate(-12 83 49)"/><ellipse cx="117" cy="49" rx="11" ry="31" fill="#fff1e8" stroke="#b88d86" stroke-width="2" transform="rotate(12 117 49)"/>`;
+    s += `<ellipse cx="83" cy="49" rx="4" ry="21" fill="#f3a5b8" transform="rotate(-12 83 49)"/><ellipse cx="117" cy="49" rx="4" ry="21" fill="#f3a5b8" transform="rotate(12 117 49)"/>`;
+    s += `<circle cx="100" cy="78" r="31" fill="#fff8ef" stroke="#b88d86" stroke-width="2"/>`;
+    s += `<ellipse cx="89" cy="76" rx="3" ry="4" fill="#493b45"/><ellipse cx="111" cy="76" rx="3" ry="4" fill="#493b45"/>`;
+    s += `<path d="M96 84 Q100 80 104 84 L100 88Z" fill="#e98da4"/><path d="M100 88 Q95 94 91 90 M100 88 Q105 94 109 90" fill="none" stroke="#76525a" stroke-width="1.8" stroke-linecap="round"/>`;
+    s += `<circle cx="80" cy="86" r="5" fill="#f4b7c4" opacity=".65"/><circle cx="120" cy="86" r="5" fill="#f4b7c4" opacity=".65"/>`;
+    s += candle(163, 113, id);
+  } else if (type === 'frog') {
+    s += `<ellipse cx="100" cy="117" rx="80" ry="20" fill="#327c59"/><ellipse cx="100" cy="112" rx="64" ry="13" fill="#65b77a"/>`;
+    s += flower(44, 109, 10, 6, '#ffd95a', '#e8890b') + flower(156, 109, 10, 6, '#5b8cff', '#ffe08a');
+    s += `<circle cx="100" cy="80" r="34" fill="#69c879" stroke="#26724c" stroke-width="2"/>`;
+    s += `<circle cx="78" cy="57" r="13" fill="#69c879" stroke="#26724c" stroke-width="2"/><circle cx="122" cy="57" r="13" fill="#69c879" stroke="#26724c" stroke-width="2"/>`;
+    s += `<circle cx="79" cy="57" r="8" fill="#fff"/><circle cx="121" cy="57" r="8" fill="#fff"/><circle cx="81" cy="58" r="3.5" fill="#26354a"/><circle cx="119" cy="58" r="3.5" fill="#26354a"/>`;
+    s += `<ellipse cx="100" cy="82" rx="4" ry="3" fill="#36734c"/><path d="M82 91 Q100 108 118 91" fill="none" stroke="#26724c" stroke-width="2.5" stroke-linecap="round"/>`;
+    s += `<circle cx="72" cy="85" r="5" fill="#ef9aa2" opacity=".65"/><circle cx="128" cy="85" r="5" fill="#ef9aa2" opacity=".65"/>`;
+    s += candle(163, 113, id);
+  } else if (type === 'turtle') {
+    s += `<ellipse cx="100" cy="118" rx="80" ry="19" fill="#267c78"/>`;
+    s += `<ellipse cx="61" cy="99" rx="22" ry="10" fill="#65c5ad" transform="rotate(-28 61 99)"/><ellipse cx="139" cy="99" rx="22" ry="10" fill="#65c5ad" transform="rotate(28 139 99)"/>`;
+    s += `<ellipse cx="70" cy="127" rx="20" ry="9" fill="#65c5ad" transform="rotate(24 70 127)"/><ellipse cx="130" cy="127" rx="20" ry="9" fill="#65c5ad" transform="rotate(-24 130 127)"/>`;
+    s += `<ellipse cx="100" cy="110" rx="42" ry="22" fill="#f0a94f" stroke="#a96038" stroke-width="2"/><path d="M100 89 V131 M61 110 H139 M73 96 L127 124 M127 96 L73 124" stroke="#a96038" stroke-width="1.5" opacity=".8"/>`;
+    s += `<circle cx="100" cy="78" r="25" fill="#72c99b" stroke="#267c78" stroke-width="2"/>`;
+    s += `<circle cx="91" cy="75" r="3" fill="#26354a"/><circle cx="109" cy="75" r="3" fill="#26354a"/><path d="M93 86 Q100 92 107 86" fill="none" stroke="#267c78" stroke-width="2" stroke-linecap="round"/>`;
+    s += flower(42, 110, 8, 6, '#f28cb3', '#ffe08a') + flower(158, 110, 8, 6, '#f28cb3', '#ffe08a');
+    s += candle(163, 113, id);
+  } else if (type === 'dragon') {
+    s += `<ellipse cx="100" cy="118" rx="80" ry="20" fill="#287c82"/><ellipse cx="100" cy="113" rx="64" ry="13" fill="#65b8a7"/>`;
+    s += flower(44, 110, 9, 6, '#ffd95a', '#e8890b') + flower(156, 110, 9, 6, '#f28cb3', '#ffe08a');
+    s += `<path d="M77 88 Q48 72 56 48 Q74 53 89 70 M123 88 Q152 72 144 48 Q126 53 111 70" fill="#8bd4c8" stroke="#337d86" stroke-width="2"/>`;
+    s += `<path d="M100 101 Q67 102 66 75 Q64 48 91 44 L87 29 Q101 32 105 43 Q126 43 135 61 Q147 87 121 99 L120 109 L80 109Z" fill="#55bfc1" stroke="#287c82" stroke-width="2"/>`;
+    s += `<path d="M91 46 L82 34 L101 42 M118 47 L129 35 L124 53" fill="#f3d16e" stroke="#287c82" stroke-width="2" stroke-linejoin="round"/>`;
+    s += `<ellipse cx="87" cy="68" rx="3.5" ry="4.5" fill="#26354a"/><ellipse cx="112" cy="68" rx="3.5" ry="4.5" fill="#26354a"/>`;
+    s += `<path d="M94 81 Q100 85 106 81" fill="none" stroke="#236a70" stroke-width="2" stroke-linecap="round"/>`;
+    s += `<circle cx="80" cy="79" r="5" fill="#f28cb3" opacity=".7"/><circle cx="120" cy="79" r="5" fill="#f28cb3" opacity=".7"/>`;
+    s += `<path d="M66 91 Q55 100 48 91 M134 91 Q145 100 152 91" fill="none" stroke="#f3d16e" stroke-width="4" stroke-linecap="round"/>`;
+    s += candle(163, 113, id);
+  } else { // coconut
+    s += `<path d="M26 92 Q34 142 100 144 Q166 142 174 92Z" fill="#6b4423"/><path d="M26 92 Q34 142 100 144 Q166 142 174 92" fill="none" stroke="#4a2d14" stroke-width="2"/>`;
+    for (let i = 0; i < 9; i++) s += `<path d="M${40 + i * 15} 100 Q${44 + i * 15} 124 ${100 + (i - 4) * 4} 142" stroke="#8a5e34" stroke-width="1.2" fill="none" opacity=".7"/>`;
+    s += `<ellipse cx="100" cy="92" rx="74" ry="17" fill="#3d2410"/><ellipse cx="100" cy="92" rx="68" ry="14" fill="#7a4d26"/>`;
+    s += incense(100, 96) + candle(100, 96, id);
+    s += flower(64, 98, 12, 10, '#ffc933', '#e8890b') + flower(136, 98, 12, 10, '#ffc933', '#e8890b') + flower(100, 108, 13, 5, '#2457d6', '#ffe08a') + flower(80, 104, 8, 5, '#5b8cff', '#ffe08a') + flower(122, 104, 8, 5, '#5b8cff', '#ffe08a');
+  }
+  return s + '</svg>';
+}
+const svgImg = svg => { const i = new Image(); i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); return i; };
+const kImgs = {}; // sprite cache
+const kImg = (t, design = null) => {
+  const key = t === 'cat' && design ? `${t}:${design.fur}:${design.flower}:${design.base}` : t;
+  return kImgs[key] || (kImgs[key] = svgImg(krathongSVG(t, design)));
+};
+
+/* ========================= STATE & DATA LAYER ========================= */
+const state = { gender: null, outfit: null, krathong: null, spot: null, nick: '', wish: '', id: null, saved: false, profileImage: null, customAvatar: null, customKrathong: { ...DEFAULT_CAT_DESIGN } };
+let cur = 'intro';
+let recent = [], stats = {}, online = 1, live = false, sb = null, channel = null;
+const seen = new Set();
+const totalCount = () => Object.values(stats).reduce((a, b) => a + b, 0);
+const genUUID = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+
+const configured = /^https?:\/\//.test(CONFIG.SUPABASE_URL) && CONFIG.SUPABASE_ANON_KEY.length > 20;
+if (configured && window.supabase) { try { sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY); } catch (e) { console.warn(e); } }
+
+const DEMO_NICKS = ['น้ำใส', 'ก้อง', 'มะลิ', 'ฟ้า', 'พี่โจ้', 'ปลาทอง', 'แพรว', 'ต้นกล้า', 'เอิร์ธ', 'ใบเตย'];
+const DEMO_WISHES = ['ขอให้แม่หายไว ๆ นะ', 'ขอให้สอบผ่านทุกวิชา', 'ขอให้เจอคนที่ใช่', 'ขอให้ครอบครัวสุขภาพแข็งแรง', 'ขอบคุณแม่คงคา ขอโทษที่ทำให้เสียหาย', 'ขอให้ปีหน้าเงินทองไหลมาเทมา', 'ขอให้ทุกคนมีความสุข', 'ขอให้น้องหมาหายป่วย'];
+const demoRow = () => {
+  const ks = Object.keys(KRATHONGS), os = Object.keys(OUTFITS), sp = SPOTS[Math.random() * SPOTS.length | 0];
+  const g = ['male', 'female', 'other'][Math.random() * 3 | 0];
+  return { id: genUUID(), created_at: new Date().toISOString(), nickname: DEMO_NICKS[Math.random() * DEMO_NICKS.length | 0], wish: DEMO_WISHES[Math.random() * DEMO_WISHES.length | 0], gender: g, outfit: os[Math.random() * os.length | 0], krathong: ks[Math.random() * ks.length | 0], spot_id: sp.id };
+};
+
+async function initData() {
+  if (sb) {
+    try {
+      const [a, b] = await Promise.all([
+        sb.from('krathongs').select('*').order('created_at', { ascending: false }).limit(60),
+        sb.from('krathong_stats').select('*')
+      ]);
+      if (a.error) throw a.error; if (b.error) throw b.error;
+      recent = a.data; recent.forEach(r => seen.add(r.id));
+      b.data.forEach(r => stats[r.spot_id] = r.total);
+      live = true;
+      channel = sb.channel('krathong-room', { config: { presence: { key: genUUID() } } })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'krathongs' }, p => onNew(p.new))
+        .on('presence', { event: 'sync' }, () => { online = Math.max(1, Object.keys(channel.presenceState()).length); renderStats(); })
+        .subscribe(async st => { if (st === 'SUBSCRIBED') { try { await channel.track({ t: Date.now() }); } catch (e) {} } });
+    } catch (e) {
+      console.warn('Supabase error → demo mode', e);
+      toast('เชื่อมต่อ Supabase ไม่ได้ ใช้โหมดสาธิตแทน');
+      sb = null; live = false;
+    }
+  }
+  if (!live) {
+    for (let i = 0; i < 16; i++) { const r = demoRow(); r.created_at = new Date(Date.now() - i * 60000).toISOString(); recent.push(r); seen.add(r.id); }
+    SPOTS.forEach(s => stats[s.id] = 20 + (Math.random() * 160 | 0));
+    online = 3 + (Math.random() * 9 | 0);
+    setInterval(() => { if (!document.hidden) onNew(demoRow()); }, 6500);
+  }
+  renderStats(); renderTicker(); refreshMarkers(); updateSpotInfo(); rebuildFloaters();
+}
+function onNew(row, own) {
+  if (!row || seen.has(row.id)) return;
+  seen.add(row.id);
+  recent.unshift(row); if (recent.length > 60) recent.pop();
+  stats[row.spot_id] = (stats[row.spot_id] || 0) + 1;
+  if (!own) addFloater(row, true);
+  renderStats(); renderTicker(); refreshMarkers(); updateSpotInfo();
+}
+function renderStats() {
+  $('#totalCnt').textContent = totalCount().toLocaleString('th-TH');
+  $('#heroCount').textContent = totalCount().toLocaleString('th-TH');
+  $('#onlineCnt').textContent = online;
+  $('#liveTxt').textContent = live ? 'Live' : 'โหมดสาธิต';
+  $('#liveDot').classList.toggle('demo', !live);
+}
+function renderTicker() {
+  const tr = $('#tickerTrack'); tr.textContent = '';
+  recent.slice(0, 14).forEach(r => {
+    const sp = document.createElement('span'), b = document.createElement('b');
+    b.textContent = r.nickname; sp.append('🏮 ', b, ` @${SPOT[r.spot_id] ? SPOT[r.spot_id].short : ''}: `, r.wish);
+    tr.append(sp);
+  });
+}
+async function saveKrathong() {
+  const row = { id: genUUID(), nickname: state.nick, wish: state.wish, gender: state.gender, outfit: state.outfit, krathong: state.krathong, spot_id: state.spot };
+  seen.add(row.id); state.id = row.id; state.saved = false;
+  if (sb && live) {
+    const { error } = await sb.from('krathongs').insert(row);
+    if (error) { toast('บันทึกคำอวยพรไม่สำเร็จ: ' + error.message); seen.delete(row.id); return; }
+    state.saved = true;
+  }
+  row.created_at = new Date().toISOString();
+  seen.delete(row.id); onNew(row, true);
+}
+
+/* ========================= UI HELPERS ========================= */
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3200); }
+const ORDER = ['intro', 'gender', 'outfit', 'krathong', 'map', 'scene', 'wish', 'float', 'share', 'view'];
+const CENTER = ['intro', 'gender', 'outfit', 'krathong', 'map'];
+const panel = $('#panel'), dock = $('#avatarDock');
+
+function go(name) {
+  cur = name;
+  $$('.step').forEach(s => s.classList.toggle('on', s.dataset.step === name));
+  document.body.dataset.step = name;
+  const idx = ORDER.indexOf(name), n = idx >= 1 && idx <= 8 ? idx : 0;
+  $$('#stepper i').forEach((i, k) => { i.classList.toggle('on', k + 1 === n); i.classList.toggle('done', k + 1 < n); });
+  panel.classList.toggle('center', CENTER.includes(name));
+  panel.classList.toggle('wide', name === 'map');
+  panel.classList.toggle('compact', ['scene', 'view', 'share'].includes(name));
+  panel.classList.toggle('hidden', name === 'float');
+  if (name === 'share') panel.setAttribute('data-share', ''); else panel.removeAttribute('data-share');
+  panel.scrollTop = 0;
+  const showAv = ['scene', 'float', 'share', 'view'].includes(name) && state.gender;
+  if (showAv) { dock.innerHTML = avatarSVG(state.gender, state.outfit); }
+  dock.classList.toggle('show', !!showAv);
+  placeDock();
+  ({ gender: renderGenders, outfit: renderOutfits, krathong: renderK, map: enterMap, scene: enterScene, wish: enterWish, float: enterFloat, share: enterShare })[name]?.();
+}
+function placeDock() {
+  if (innerWidth < 700 && !panel.classList.contains('hidden') && ['scene', 'share', 'view'].includes(cur)) dock.style.bottom = (panel.offsetHeight + 16) + 'px';
+  else dock.style.bottom = '0px';
+}
+addEventListener('resize', () => { placeDock(); });
+new ResizeObserver(placeDock).observe(panel);
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+
+/* ----- step 1: gender ----- */
+function renderGenders() {
+  const g = $('#genderGrid'); g.textContent = '';
+  GENDERS.forEach(x => {
+    const first = x.id === 'female' ? 'f_sabai' : x.id === 'male' ? 'm_ratcha' : (state.outfit || 'm_pattern');
+    const b = document.createElement('button'); b.className = 'card' + (state.gender === x.id ? ' sel' : '');
+    b.innerHTML = avatarSVG(x.id, first) + `<div class="t">${x.label}</div><div class="d">${x.d}</div>`;
+    b.onclick = () => { if (state.gender !== x.id) state.outfit = null; state.gender = x.id; $$('.card', g).forEach(c => c.classList.remove('sel')); b.classList.add('sel'); $('#genderNext').disabled = false; };
+    g.append(b);
+  });
+  $('#genderNext').disabled = !state.gender;
+}
+$('#genderNext').onclick = () => go('outfit');
+/* ----- step 2: outfit ----- */
+function renderOutfits() {
+  const g = $('#outfitGrid'); g.textContent = '';
+  const want = state.gender === 'female' ? 'f' : state.gender === 'male' ? 'm' : null;
+  Object.entries(OUTFITS).filter(([, o]) => !want || o.g === want).forEach(([id, o]) => {
+    const b = document.createElement('button'); b.className = 'card' + (state.outfit === id ? ' sel' : '');
+    b.innerHTML = avatarSVG(state.gender, id) + `<div class="t">${o.name}</div><div class="d">${o.d}</div>`;
+    b.onclick = () => {
+      state.outfit = id;
+      $$('.card', g).forEach(c => c.classList.remove('sel'));
+      b.classList.add('sel');
+      $('#avatarTopColor').value = state.customAvatar?.top || o.top;
+      $('#avatarBottomColor').value = state.customAvatar?.bottom || o.bottom;
+      $('#avatarPatternColor').value = state.customAvatar?.pattern || o.pat;
+      $('#outfitNext').disabled = false;
+    };
+    g.append(b);
+  });
+  $('#outfitNext').disabled = !state.outfit;
+  const firstAvailable = Object.entries(OUTFITS).find(([, outfit]) => !want || outfit.g === want);
+  const selected = OUTFITS[state.outfit] || (firstAvailable ? firstAvailable[1] : OUTFITS.f_sabai);
+  $('#avatarHairColor').value = state.customAvatar?.hair || '#14193a';
+  $('#avatarSkinColor').value = state.customAvatar?.skin || '#f3cfa6';
+  $('#avatarTopColor').value = state.customAvatar?.top || selected.top;
+  $('#avatarBottomColor').value = state.customAvatar?.bottom || selected.bottom;
+  $('#avatarPatternColor').value = state.customAvatar?.pattern || selected.pat;
+  const preview = $('#profilePreview');
+  preview.src = state.profileImage || '';
+  preview.style.display = state.profileImage ? 'block' : 'none';
+  $('#removePhoto').hidden = !state.profileImage;
+}
+$('#outfitNext').onclick = () => go('krathong');
+$('#profilePhoto').onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    toast('เลือกรูป JPG, PNG หรือ WebP นะ');
+    e.target.value = '';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toast('รูปมีขนาดใหญ่เกินไป เลือกรูปไม่เกิน 5 MB');
+    e.target.value = '';
+    return;
+  }
+  const url = URL.createObjectURL(file), image = new Image();
+  image.onload = () => {
+    const size = 256, scale = Math.max(size / image.width, size / image.height);
+    const width = image.width * scale, height = image.height * scale;
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (!context) { URL.revokeObjectURL(url); toast('เปิดรูปไม่สำเร็จ ลองเลือกรูปอื่น'); return; }
+    context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+    state.profileImage = canvas.toDataURL('image/jpeg', .82);
+    URL.revokeObjectURL(url);
+    renderOutfits();
+    toast('เพิ่มรูปแล้ว รูปนี้ใช้เฉพาะในอุปกรณ์นี้');
+  };
+  image.onerror = () => { URL.revokeObjectURL(url); toast('อ่านรูปไม่สำเร็จ ลองเลือกรูปอื่น'); };
+  image.src = url;
+};
+$('#removePhoto').onclick = () => {
+  state.profileImage = null;
+  $('#profilePhoto').value = '';
+  renderOutfits();
+};
+[['avatarHairColor', 'hair'], ['avatarSkinColor', 'skin'], ['avatarTopColor', 'top'], ['avatarBottomColor', 'bottom'], ['avatarPatternColor', 'pattern']].forEach(([id, key]) => {
+  $('#' + id).oninput = e => {
+    state.customAvatar = { ...(state.customAvatar || {}), [key]: e.target.value };
+    renderOutfits();
+  };
+});
+/* ----- step 3: krathong ----- */
+function renderK() {
+  const g = $('#kGrid'); g.textContent = '';
+  Object.entries(KRATHONGS).forEach(([id, k]) => {
+    const b = document.createElement('button'); b.className = 'card k' + (state.krathong === id ? ' sel' : '');
+    b.innerHTML = krathongSVG(id, state.customKrathong) + `<div class="t">${k.name}</div><div class="d">${k.d}</div>`;
+    b.onclick = () => { state.krathong = id; $$('.card', g).forEach(c => c.classList.remove('sel')); b.classList.add('sel'); $('#kNext').disabled = false; };
+    g.append(b);
+  });
+  $('#kNext').disabled = !state.krathong;
+  $('#catFurColor').value = state.customKrathong.fur;
+  $('#catFlowerColor').value = state.customKrathong.flower;
+  $('#catBaseColor').value = state.customKrathong.base;
+}
+[['catFurColor', 'fur'], ['catFlowerColor', 'flower'], ['catBaseColor', 'base']].forEach(([id, key]) => {
+  $('#' + id).oninput = e => {
+    state.customKrathong[key] = e.target.value;
+    renderK();
+  };
+});
+$('#kNext').onclick = () => go('map');
+
+/* ----- step 4: map ----- */
+let map = null; const markers = {};
+const pinIcon = sp => L.divIcon({ className: '', iconSize: [0, 0], html: `<div class="pin ${state.spot === sp.id ? 'sel' : ''}"><div class="drop"></div><span class="cnt">${(stats[sp.id] || 0).toLocaleString('th-TH')}</span></div>` });
+function refreshMarkers() { if (!map) return; SPOTS.forEach(sp => markers[sp.id] && markers[sp.id].setIcon(pinIcon(sp))); }
+function enterMap() {
+  if (!map) {
+    if (!window.L) { toast('โหลดแผนที่ไม่สำเร็จ ลองเลือกจากรายการด้านล่าง'); }
+    else {
+      map = L.map('map', { zoomControl: true, worldCopyJump: false }).setView([15.6, 101.2], innerWidth < 700 ? 5 : 6);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors', maxZoom: 19 }).addTo(map);
+      SPOTS.forEach(sp => { const m = L.marker([sp.lat, sp.lng], { icon: pinIcon(sp), title: sp.name, keyboard: true }).addTo(map); m.bindTooltip(sp.short, { permanent: true, direction: 'bottom', offset: [0, 4], className: 'pinlabel' }); m.on('click', () => selectSpot(sp.id, true)); markers[sp.id] = m; });
+    }
+    renderSpotPicker();
+  }
+  setTimeout(() => { if (map) { map.invalidateSize(); if (!state.spot) map.fitBounds(SPOTS.map(s => [s.lat, s.lng]), { padding: [28, 28] }); } }, 120);
+  updateSpotInfo();
+}
+function renderSpotPicker() {
+  const provinces = [...new Set(SPOTS.map(sp => sp.prov))];
+  const chips = $('#spotChips');
+  chips.textContent = '';
+  const suggestions = $('#provinceSuggestions');
+  suggestions.textContent = '';
+  PROVINCES.forEach(prov => {
+    const option = document.createElement('option'); option.value = prov;
+    suggestions.append(option);
+  });
+  provinces.forEach(prov => {
+    const b = document.createElement('button');
+    b.className = 'chipbtn'; b.dataset.prov = prov; b.textContent = prov;
+    b.onclick = () => { $('#spotSearch').value = prov; updateSpotPicker(); };
+    chips.append(b);
+  });
+  $('#spotSearch').oninput = updateSpotPicker;
+  updateSpotPicker();
+}
+function updateSpotPicker() {
+  const query = $('#spotSearch').value.trim().toLocaleLowerCase('th-TH');
+  const results = SPOTS.filter(sp => !query || `${sp.prov} ${sp.name} ${sp.river} ${sp.blurb}`.toLocaleLowerCase('th-TH').includes(query));
+  const province = PROVINCES.find(prov => prov.toLocaleLowerCase('th-TH') === query);
+  $$('#spotChips .chipbtn').forEach(b => b.classList.toggle('sel', !!query && query === b.dataset.prov.toLocaleLowerCase('th-TH')));
+  const list = $('#spotResults');
+  list.textContent = '';
+  if (!results.length) {
+    const empty = document.createElement('div'); empty.className = 'spot-empty';
+    empty.textContent = province
+      ? `ค้นพบจังหวัด${province} แต่ยังไม่มีข้อมูลสถานที่เด่นให้เลือก`
+      : 'ไม่พบจังหวัดหรือสถานที่ ลองค้นหาชื่ออื่น';
+    list.append(empty); return;
+  }
+  results.forEach(sp => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'spot-option' + (state.spot === sp.id ? ' sel' : '');
+    b.innerHTML = `<b>${sp.name}</b><span>${sp.prov} · ${sp.river} · ลอยแล้ว ${(stats[sp.id] || 0).toLocaleString('th-TH')} ใบ</span>`;
+    b.setAttribute('aria-pressed', state.spot === sp.id ? 'true' : 'false');
+    b.onclick = () => selectSpot(sp.id, true);
+    list.append(b);
+  });
+  if (!query) $$('#spotChips .chipbtn').forEach(b => b.classList.remove('sel'));
+}
+function selectSpot(id, fly) {
+  state.spot = id; const sp = SPOT[id];
+  refreshMarkers();
+  updateSpotPicker();
+  if (fly && map) map.flyTo([sp.lat, sp.lng], Math.max(map.getZoom(), 8), { duration: .8 });
+  $('#mapNext').disabled = false;
+  setScene(sp); updateSpotInfo();
+}
+function updateSpotInfo() {
+  const box = $('#spotInfo'); if (!box) return;
+  const sp = state.spot && SPOT[state.spot]; if (!sp) return;
+  const last = recent.find(r => r.spot_id === sp.id);
+  box.textContent = '';
+  const l = document.createElement('div');
+  l.innerHTML = `<div class="nm"></div><div class="bl"></div><div class="cn">ลอยแล้ว <b></b> ใบ</div>`;
+  $('.nm', l).textContent = '📍 ' + sp.name + ' · ' + sp.prov; $('.bl', l).textContent = sp.blurb; $('.cn b', l).textContent = (stats[sp.id] || 0).toLocaleString('th-TH');
+  if (last) { const w = document.createElement('div'); w.className = 'cn'; w.textContent = `ล่าสุด: ${last.nickname} — “${last.wish}”`; l.append(w); }
+  box.append(l);
+}
+$('#mapNext').onclick = () => { if (state.spot) go('scene'); };
+
+/* ----- step 5: scene ----- */
+function enterScene() {
+  const sp = SPOT[state.spot]; setScene(sp);
+  $('#sceneTitle').textContent = '5 · ' + sp.river + ' · ' + sp.prov;
+  $('#sceneSub').textContent = sp.blurb;
+}
+$('#sceneNext').onclick = () => go('wish');
+/* ----- step 6: wish ----- */
+function enterWish() {
+  $('#wAv').innerHTML = avatarSVG(state.gender, state.outfit); $('#wKr').innerHTML = krathongSVG(state.krathong, state.customKrathong);
+  $('#wAv svg').classList.add('av'); $('#wKr svg').classList.add('kr');
+  $('#wAv svg').style.height = ''; $('#wishSub').textContent = 'ลอยที่ ' + SPOT[state.spot].name;
+  $('#nick').value = state.nick; $('#wish').value = state.wish; checkWish();
+  const c = $('#wishChips'); if (!c.children.length) WISH_IDEAS.forEach(w => { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = w; b.onclick = () => { $('#wish').value = w; checkWish(); }; c.append(b); });
+}
+function checkWish() { state.nick = $('#nick').value.trim(); state.wish = $('#wish').value.trim(); $('#wc').textContent = $('#wish').value.length; $('#floatBtn').disabled = !(state.nick && state.wish); }
+$('#nick').oninput = $('#wish').oninput = checkWish;
+$('#floatBtn').onclick = () => {
+  let last = 0; try { last = +localStorage.getItem('loy_last') || 0; } catch (e) {}
+  if (Date.now() - last < 15000) return toast('รอสักครู่ก่อนลอยใบต่อไปนะ 🪷');
+  try { localStorage.setItem('loy_last', Date.now()); } catch (e) {}
+  go('float');
+};
+
+/* ----- step 7: float ----- */
+let floatTimer;
+function enterFloat() {
+  const cap = $('#caption');
+  cap.innerHTML = '<span></span><small>กำลังปล่อยกระทงลงสายน้ำ…</small>'; cap.firstChild.textContent = `ขอให้เป็นจริงนะ ${state.nick}`; cap.classList.add('on');
+  dock.classList.remove('release'); void dock.offsetWidth; dock.classList.add('release');
+  saveKrathong();
+  startMe();
+  clearTimeout(floatTimer);
+  floatTimer = setTimeout(() => { cap.classList.remove('on'); if (cur === 'float') go('share'); }, 11500);
+}
+
+/* ----- step 8: share ----- */
+let cardBlob = null, cardUrl = '';
+const shareURL = () => { const u = new URL(location.href); u.search = ''; u.hash = ''; if (state.id && state.saved) u.searchParams.set('k', state.id); return u.toString(); };
+const shareText = () => `ฉันลอยกระทงที่ ${SPOT[state.spot].name} 🏮 “${state.wish}” — มาลอยกระทงออนไลน์ด้วยกัน`;
+async function enterShare() {
+  const sp = SPOT[state.spot];
+  $('#shareSub').textContent = `${state.nick} · ${sp.name} · คำอวยพรของคุณลอยอยู่บนสายน้ำให้ทุกคนเห็นแล้ว`;
+  const u = encodeURIComponent(shareURL()), t = encodeURIComponent(shareText());
+  $('#shFb').href = `https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`;
+  $('#shX').href = `https://twitter.com/intent/tweet?text=${t}&url=${u}`;
+  $('#shLine').href = `https://social-plugins.line.me/lineit/share?url=${u}&text=${t}`;
+  cardBlob = null; try { await buildCard(); } catch (e) { console.warn(e); }
+}
+$('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(shareURL()); toast('คัดลอกลิงก์แล้ว'); } catch (e) { prompt('คัดลอกลิงก์นี้', shareURL()); } };
+$('#shDl').onclick = async () => { if (!cardBlob) await buildCard(); if (!cardBlob) return toast('สร้างภาพไม่สำเร็จ'); const a = document.createElement('a'); a.href = cardUrl; a.download = 'loy-krathong.png'; a.click(); };
+$('#shNative').onclick = async () => {
+  if (!cardBlob) await buildCard();
+  const data = { title: 'ลอยกระทงออนไลน์', text: shareText(), url: shareURL() };
+  try {
+    if (cardBlob && navigator.canShare) { const f = new File([cardBlob], 'loy-krathong.png', { type: 'image/png' }); if (navigator.canShare({ files: [f] })) { await navigator.share({ ...data, files: [f] }); return; } }
+    if (navigator.share) { await navigator.share(data); return; }
+    await navigator.clipboard.writeText(shareText() + ' ' + shareURL()); toast('คัดลอกข้อความ + ลิงก์แล้ว เอาไปวางได้เลย');
+  } catch (e) { if (e && e.name !== 'AbortError') toast('แชร์ไม่สำเร็จ ลองปุ่มอื่นแทน'); }
+};
+$('#again').onclick = () => { me.state = 'none'; state.krathong = null; state.nick = ''; state.wish = ''; state.id = null; go('krathong'); };
+$('#startBtn').onclick = () => go('gender');
+$('#viewCta').onclick = () => { me.state = 'none'; history.replaceState(null, '', location.pathname); state.gender = state.outfit = state.krathong = state.spot = null; state.nick = state.wish = ''; state.profileImage = null; state.customAvatar = null; state.customKrathong = { ...DEFAULT_CAT_DESIGN }; go('gender'); };
+
+const segs = t => { try { return [...new Intl.Segmenter('th', { granularity: 'word' }).segment(t)].map(s => s.segment); } catch (e) { return [...t]; } };
+function wrapText(g, text, maxW) {
+  const out = []; let line = '';
+  for (const s of segs(text)) { const test = line + s; if (g.measureText(test).width > maxW && line) { out.push(line.trim()); line = s; } else line = test; }
+  if (line.trim()) out.push(line.trim()); return out.slice(0, 6);
+}
+async function buildCard() {
+  try { await Promise.all([document.fonts.load('600 40px Mitr'), document.fonts.load('400 30px Prompt')]); } catch (e) {}
+  const cw = 1080, ch = 1350, c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d');
+  const bg = g.createLinearGradient(0, 0, 0, ch); bg.addColorStop(0, '#071536'); bg.addColorStop(1, '#0f2656'); g.fillStyle = bg; g.fillRect(0, 0, cw, ch);
+  g.textAlign = 'center'; g.fillStyle = '#ffc933'; g.font = '600 62px Mitr, sans-serif'; g.fillText('🏮 ลอยกระทงออนไลน์', cw / 2, 128);
+  g.fillStyle = '#b9ceff'; g.font = '400 28px Prompt, sans-serif'; g.fillText('คืนเพ็ญเดือนสิบสอง', cw / 2, 172);
+  // scene crop
+  const aspect = 960 / 740, srcH = Math.min(H, W / aspect), srcW = srcH * aspect;
+  const sx = clamp(me.x - srcW * .5, 0, W - srcW), sy = clamp(me.y - srcH * .6, 0, H - srcH);
+  g.save(); g.beginPath(); g.roundRect(60, 205, 960, 740, 34); g.clip();
+  g.drawImage(cv, sx * DPR, sy * DPR, srcW * DPR, srcH * DPR, 60, 205, 960, 740);
+  const av = svgImg(avatarSVG(state.gender, state.outfit, true)); await av.decode().catch(() => {});
+  try { g.drawImage(av, 90, 945 - 330, 330 * 120 / 214, 330); } catch (e) {}
+  g.restore(); g.strokeStyle = 'rgba(255,201,51,.6)'; g.lineWidth = 3; g.beginPath(); g.roundRect(60, 205, 960, 740, 34); g.stroke();
+  // wish
+  g.fillStyle = '#ffe08a'; g.font = '500 44px Prompt, sans-serif';
+  const lines = wrapText(g, '“' + state.wish + '”', 900); let y = 1040;
+  lines.forEach(l => { g.fillText(l, cw / 2, y); y += 62; });
+  g.fillStyle = '#ffc933'; g.font = '600 36px Mitr, sans-serif'; g.fillText('— ' + state.nick + ' · ' + SPOT[state.spot].short, cw / 2, y + 26);
+  g.fillStyle = '#b9ceff'; g.font = '400 26px Prompt, sans-serif'; g.fillText('มาลอยกระทงด้วยกันที่ ' + (location.host || 'loy-krathong'), cw / 2, ch - 50);
+  await new Promise(r => c.toBlob(b => { cardBlob = b; r(); }, 'image/png'));
+  if (cardUrl) URL.revokeObjectURL(cardUrl); if (cardBlob) { cardUrl = URL.createObjectURL(cardBlob); $('#cardPrev').src = cardUrl; }
+}
+
+/* ========================= SCENE (canvas) ========================= */
+const cv = $('#scene'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, horizon = 0, lmCv = null, lmH = 0, spot = SPOTS[0];
+let sceneFade = 1, zoom = 0, stars = [], lanterns = [], glints = [], floaters = [], rings = [], orbs = [], orbT = 0;
+const SIL = '#050f2b';
+const rng = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+/* --- landmark silhouettes (baseline = h) --- */
+function lights(g, x0, x1, y0, y1, n, seed) { const r = rng(seed); for (let i = 0; i < n; i++) { g.fillStyle = `rgba(255,${190 + r() * 40 | 0},80,${.4 + r() * .6})`; g.fillRect(x0 + r() * (x1 - x0), y0 + r() * (y1 - y0), 2, 2); } }
+function prang(g, cx, by, hh, ww) {
+  const pts = [], T = 6;
+  for (let i = 0; i < T; i++) { const y0 = by - hh * .8 * i / T, y1 = by - hh * .8 * (i + 1) / T, w0 = ww / 2 * (1 - .8 * i / T), w1 = ww / 2 * (1 - .8 * (i + 1) / T); pts.push([w0, y0], [w1 * 1.2, y1]); }
+  pts.push([ww * .03, by - hh * .8], [0, by - hh]);
+  g.beginPath(); g.moveTo(cx - ww / 2, by); pts.forEach(p => g.lineTo(cx - p[0], p[1]));
+  for (let i = pts.length - 2; i >= 0; i--) g.lineTo(cx + pts[i][0], pts[i][1]);
+  g.lineTo(cx + ww / 2, by); g.closePath(); g.fill();
+}
+function roof(g, x, by, w, h) { g.beginPath(); g.moveTo(x - w / 2, by); g.lineTo(x - w * .34, by - h); g.lineTo(x + w * .34, by - h); g.lineTo(x + w / 2, by); g.closePath(); g.fill(); }
+function ridge(g, w, h, base, amp, f, ph, col) { g.fillStyle = col; g.beginPath(); g.moveTo(0, h); for (let x = 0; x <= w; x += 6) g.lineTo(x, h * (1 - ridgeV(x, base, amp, f, ph))); g.lineTo(w, h); g.closePath(); g.fill(); }
+const ridgeV = (x, base, amp, f, ph) => base + amp * (.5 + .3 * Math.sin(x * f + ph) + .2 * Math.sin(x * f * 2.7 + ph * 2));
+function palm(g, x, by, hh, lean) {
+  g.strokeStyle = SIL; g.lineWidth = 5; g.beginPath(); g.moveTo(x, by); g.quadraticCurveTo(x + lean * .4, by - hh * .5, x + lean, by - hh); g.stroke();
+  const tx = x + lean, ty = by - hh; g.lineWidth = 2.4;
+  for (let i = 0; i < 8; i++) { const a = -Math.PI + i * Math.PI / 7; g.beginPath(); g.moveTo(tx, ty); g.quadraticCurveTo(tx + Math.cos(a) * hh * .25, ty + Math.sin(a) * hh * .25 - hh * .12, tx + Math.cos(a) * hh * .42, ty + Math.sin(a) * hh * .3 + hh * .12); g.stroke(); }
+}
+const LM = {
+  arun(g, w, h) {
+    g.fillStyle = SIL; const r = rng(7);
+    for (let x = 0; x < w * .5;) { const bw = 16 + r() * 36, bh = h * (.06 + r() * .2); g.fillRect(x, h - bh, bw, bh); x += bw + 2; }
+    for (let x = w * .86; x < w;) { const bw = 16 + r() * 30, bh = h * (.05 + r() * .12); g.fillRect(x, h - bh, bw, bh); x += bw + 2; }
+    const cx = w * .68; g.fillRect(cx - h * .45, h - h * .07, h * .9, h * .07);
+    prang(g, cx, h - h * .06, h * .92, h * .3); [-1, 1].forEach(s => prang(g, cx + s * h * .3, h - h * .06, h * .46, h * .15));
+    roof(g, cx - h * .7, h - h * .06, h * .44, h * .2); roof(g, cx + h * .68, h - h * .06, h * .4, h * .17); g.fillRect(0, h - 5, w, 5);
+    lights(g, 0, w * .5, h * .55, h - 6, 60, 3); lights(g, cx - h * .15, cx + h * .15, h * .3, h * .9, 6, 5);
+  },
+  mountain(g, w, h) {
+    const L = [{ c: '#0c2154', b: .34, a: .42, f: .004, p: 0 }, { c: '#081a46', b: .24, a: .3, f: .007, p: 2 }, { c: '#050f2b', b: .1, a: .2, f: .011, p: 4 }];
+    L.forEach(l => ridge(g, w, h, l.b, l.a, l.f, l.p, l.c));
+    const px = w * .3, py = h * (1 - ridgeV(px, L[0].b, L[0].a, L[0].f, L[0].p)); const gr = g.createRadialGradient(px, py - 14, 0, px, py - 14, 60); gr.addColorStop(0, 'rgba(255,210,90,.7)'); gr.addColorStop(1, 'rgba(255,210,90,0)'); g.fillStyle = gr; g.fillRect(px - 60, py - 74, 120, 120);
+    g.fillStyle = '#ffd25a'; g.beginPath(); g.moveTo(px - 12, py + 2); g.quadraticCurveTo(px - 12, py - 16, px, py - 18); g.quadraticCurveTo(px + 12, py - 16, px + 12, py + 2); g.fill(); g.fillRect(px - 1.5, py - 34, 3, 18);
+    g.fillStyle = SIL; g.fillRect(0, h - 5, w, 5); lights(g, 0, w, h * .72, h - 6, 120, 11);
+  },
+  prang(g, w, h) {
+    g.fillStyle = SIL; ridge(g, w, h, .06, .08, .003, 1, '#07173d'); g.fillStyle = SIL;
+    const cx = w * .56; g.fillRect(cx - h * .52, h - h * .1, h * 1.04, h * .1); g.fillRect(cx - h * .4, h - h * .17, h * .8, h * .08);
+    prang(g, cx, h - h * .15, h * .86, h * .3); [-1, 1].forEach(s => prang(g, cx + s * h * .33, h - h * .12, h * .44, h * .14)); [-1, 1].forEach(s => prang(g, cx + s * h * .6, h - h * .1, h * .26, h * .1));
+    const r = rng(9); for (let i = 0; i < 12; i++) { const x = r() * w; if (Math.abs(x - cx) < h * .8) continue; g.fillRect(x, h - 14 - r() * h * .12, 6 + r() * 14, 20 + r() * h * .12); }
+    for (let i = 0; i < 14; i++) { const x = r() * w; if (Math.abs(x - cx) < h * .7) continue; g.beginPath(); g.ellipse(x, h - 10, 18 + r() * 14, 20 + r() * 16, 0, 0, 7); g.fill(); }
+    g.fillRect(0, h - 5, w, 5);
+  },
+  chedi(g, w, h) {
+    g.fillStyle = SIL; const cx = w * .5;
+    const bud = (cx, by, s) => { g.fillRect(cx - h * .34 * s, by - h * .06 * s, h * .68 * s, h * .06 * s); g.fillRect(cx - h * .26 * s, by - h * .12 * s, h * .52 * s, h * .06 * s); g.fillRect(cx - h * .19 * s, by - h * .18 * s, h * .38 * s, h * .06 * s); g.fillRect(cx - h * .12 * s, by - h * .3 * s, h * .24 * s, h * .12 * s);
+      g.beginPath(); g.moveTo(cx - h * .1 * s, by - h * .3 * s); g.bezierCurveTo(cx - h * .2 * s, by - h * .42 * s, cx - h * .14 * s, by - h * .58 * s, cx, by - h * .82 * s); g.bezierCurveTo(cx + h * .14 * s, by - h * .58 * s, cx + h * .2 * s, by - h * .42 * s, cx + h * .1 * s, by - h * .3 * s); g.closePath(); g.fill(); g.fillRect(cx - 1.5, by - h * .98 * s, 3, h * .2 * s); };
+    bud(cx, h - 6, 1); bud(cx - h * .85, h - 6, .5); bud(cx + h * .85, h - 6, .5);
+    const r = rng(21); for (let i = 0; i < 16; i++) { const x = r() < .5 ? r() * w * .3 : w * .7 + r() * w * .3; g.fillRect(x, h - 8 - r() * h * .22, 6, 8 + r() * h * .22); }
+    for (let i = 0; i < 14; i++) { const x = r() * w; if (Math.abs(x - cx) < h * .9) continue; g.beginPath(); g.ellipse(x, h - 12, 20 + r() * 20, 22 + r() * 22, 0, 0, 7); g.fill(); }
+    g.fillRect(0, h - 5, w, 5);
+  },
+  bridge(g, w, h) {
+    ridge(g, w, h, .22, .3, .005, 3, '#0a1d4b'); ridge(g, w, h, .08, .16, .008, 1, '#071636'); g.fillStyle = SIL;
+    const by = h - h * .1, x0 = w * .1, x1 = w * .9, n = 3, span = (x1 - x0) / n;
+    g.fillRect(x0, by - h * .03, x1 - x0, h * .03); for (let i = 0; i <= n; i++) g.fillRect(x0 + i * span - 7, by, 14, h * .1);
+    g.strokeStyle = SIL; g.lineWidth = 3;
+    for (let i = 0; i < n; i++) { const a = x0 + i * span, y0 = by - h * .03; const top = k => y0 - h * .3 * (1 - Math.pow(k * 2 - 1, 2)); const m = 10;
+      g.beginPath(); for (let k = 0; k <= m; k++) { const xx = a + span * k / m; k ? g.lineTo(xx, top(k / m)) : g.moveTo(xx, top(0)); } g.stroke();
+      for (let k = 0; k <= m; k++) { const xx = a + span * k / m; g.beginPath(); g.moveTo(xx, y0); g.lineTo(xx, top(k / m)); g.stroke(); if (k < m) { g.beginPath(); g.moveTo(xx, y0); g.lineTo(a + span * (k + 1) / m, top((k + 1) / m)); g.stroke(); } } }
+    g.fillRect(0, h - 5, w, 5); lights(g, x0, x1, by - h * .03, by, 14, 8);
+  },
+  palms(g, w, h) {
+    ridge(g, w, h, .05, .08, .004, 2, '#07173d'); g.fillStyle = SIL; const cx = w * .36;
+    g.fillRect(cx - h * .3, h - h * .13, h * .6, h * .13); roof(g, cx, h - h * .13, h * .78, h * .24); roof(g, cx, h - h * .3, h * .5, h * .15);
+    g.fillRect(cx + h * .5, h - h * .05, h * .2, h * .05); prang(g, cx + h * .8, h - h * .02, h * .5, h * .14);
+    const r = rng(33); [.08, .14, .2, .55, .62, .7, .78, .88, .94].forEach(f => palm(g, w * f + (r() - .5) * 20, h - 4, h * (.5 + r() * .4), (r() - .5) * h * .25));
+    g.fillStyle = SIL; g.fillRect(0, h - 5, w, 5); lights(g, cx - h * .3, cx + h * .3, h - h * .13, h - 6, 8, 4);
+  },
+  naga(g, w, h) {
+    ridge(g, w, h, .05, .13, .0035, 5, '#0a1d4b'); ridge(g, w, h, .02, .06, .009, 1, '#07173d'); g.fillStyle = SIL;
+    const cx = w * .64; g.beginPath(); g.ellipse(cx, h - h * .14, h * .12, h * .13, 0, Math.PI, 0); g.fill(); g.fillRect(cx - h * .15, h - h * .14, h * .3, h * .1); g.fillRect(cx - 2, h - h * .5, 4, h * .24);
+    g.beginPath(); g.moveTo(cx - 8, h - h * .26); g.lineTo(cx, h - h * .52); g.lineTo(cx + 8, h - h * .26); g.fill();
+    g.fillRect(0, h - 5, w, 5); for (let x = 12; x < w; x += 46) { g.fillStyle = 'rgba(255,210,100,.85)'; g.fillRect(x, h - 14, 3, 3); g.fillStyle = SIL; g.fillRect(x + 1, h - 12, 1, 8); }
+  },
+  houseboat(g, w, h) {
+    ridge(g, w, h, .06, .1, .005, 4, '#07173d'); g.fillStyle = SIL; const r = rng(45);
+    for (let i = 0; i < 24; i++) { const x = r() * w; g.beginPath(); g.ellipse(x, h - 14, 22 + r() * 24, 24 + r() * 28, 0, 0, 7); g.fill(); }
+    for (let x = w * .05; x < w * .95; x += 62 + r() * 40) { const hw = 40 + r() * 20, hh = 18 + r() * 8; g.fillStyle = SIL; g.fillRect(x, h - hh - 4, hw, hh); roof(g, x + hw / 2, h - hh - 4, hw + 14, 16); g.fillStyle = 'rgba(255,190,70,.9)'; g.fillRect(x + 6, h - hh + 2, 7, 8); g.fillRect(x + hw - 14, h - hh + 2, 7, 8); }
+    g.fillStyle = SIL; g.fillRect(0, h - 4, w, 4);
+  }
+};
+
+/* --- layout & build --- */
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  horizon = H * .46; buildLandmark();
+  const r = rng(99); stars = Array.from({ length: reduced ? 60 : 140 }, () => ({ x: r() * W, y: r() * horizon * .92, r: .4 + r() * 1.3, sp: .6 + r() * 2, ph: r() * 6 }));
+  glints = Array.from({ length: 70 }, () => ({ x: r(), y: r(), ph: r() * 9, sp: .5 + r() * 1.5 }));
+  lanterns = Array.from({ length: reduced ? 6 : 18 }, () => newLantern(true));
+}
+function buildLandmark() {
+  lmH = Math.round(horizon * .72); lmCv = document.createElement('canvas'); lmCv.width = Math.round(W * DPR); lmCv.height = Math.round(lmH * DPR);
+  const g = lmCv.getContext('2d'); g.scale(DPR, DPR); (LM[spot.scene] || LM.arun)(g, W, lmH);
+}
+function setScene(sp) { if (sp === spot) return; spot = sp; buildLandmark(); sceneFade = 1; zoom = 1; orbs = []; rebuildFloaters(); }
+function newLantern(init) { return { x: rand(.05, .95) * W, y: init ? rand(horizon * .1, horizon) : horizon - rand(0, 30), s: rand(5, 12), v: rand(9, 22), ph: rand(0, 6), fl: rand(1, 3) }; }
+
+/* --- floaters (everyone's krathongs) --- */
+function makeFloater(row, fromLeft) {
+  const d = rand(.08, .96); return { row, img: kImg(row.krathong), d, x: fromLeft ? -W * .05 : rand(-.05, 1.05) * W, vx: rand(5, 14) * (.35 + d), seed: rand(0, 9), born: performance.now(), nick: row.nickname };
+}
+function addFloater(row, left) { floaters.push(makeFloater(row, left)); if (floaters.length > 36) floaters.shift(); const f = floaters[floaters.length - 1]; const y = floaterY(f); rings.push({ x: f.x, y, r: 4, a: 1 }); }
+function rebuildFloaters() {
+  const same = recent.filter(r => r.spot_id === spot.id), other = recent.filter(r => r.spot_id !== spot.id);
+  floaters = [...same, ...other].slice(0, 30).map(r => makeFloater(r, false));
+}
+const floaterY = f => horizon + 14 + f.d * f.d * (H - horizon - 70);
+const sizeAtY = y => Math.min(W, H) * .17 * (.28 + .95 * clamp((y - horizon) / (H - horizon), 0, 1));
+
+function drawKrathong(img, x, y, size, t, seed, alpha = 1, glow = 1) {
+  if (!img.complete || !img.naturalWidth) return;
+  const w = size, h = size * .75, bob = Math.sin(t * 1.6 + seed) * size * .02, tilt = Math.sin(t * 1.1 + seed * 2) * .035;
+  ctx.save(); ctx.globalAlpha = alpha;
+  const gl = ctx.createRadialGradient(x, y - h * .25, 0, x, y - h * .25, size * 1.05); const fl = .85 + .15 * Math.sin(t * 9 + seed * 3);
+  gl.addColorStop(0, `rgba(255,201,51,${.38 * glow * fl})`); gl.addColorStop(1, 'rgba(255,201,51,0)'); ctx.fillStyle = gl; ctx.fillRect(x - size * 1.1, y - size * 1.2, size * 2.2, size * 2.2);
+  // flame reflection
+  for (let j = 0; j < 5; j++) { ctx.fillStyle = `rgba(255,214,110,${.28 * (1 - j / 5) * glow})`; const ww = size * .09 * (1 - j / 6) * (1 + .5 * Math.sin(t * 3 + j + seed)); ctx.fillRect(x - ww / 2 + Math.sin(t * 2 + j + seed) * 2, y + size * .06 + j * size * .06, ww, size * .025); }
+  ctx.translate(x, y + bob); ctx.rotate(tilt); ctx.drawImage(img, -w / 2, -h * .82, w, h); ctx.restore();
+}
+
+/* --- me (the person's krathong) --- */
+const me = { state: 'none', t: 0, x: 0, y: 0, hx: 0, hy: 0, wx: 0, wy: 0, ex: 0, ey: 0, img: null, splash: false };
+function startMe() {
+  const r = dock.getBoundingClientRect(); me.img = kImg(state.krathong, state.customKrathong); me.t = 0; me.state = 'float'; me.splash = false;
+  me.hx = r.left + r.width * (96 / 120); me.hy = r.top + r.height * (124 / 214);
+  me.wx = Math.max(r.right + W * .06, W * .3); me.wy = H * .87;
+  me.ex = W * (W < 700 ? .56 : .6); me.ey = horizon + (H - horizon) * .22;
+  me.x = me.hx; me.y = me.hy;
+}
+function mePos(t) {
+  const T1 = 1.4, T2 = 3.4, T3 = 12;
+  if (t < T1) return { x: me.hx, y: me.hy + Math.sin(t * 3) * 2 };
+  if (t < T2) { const u = (t - T1) / (T2 - T1), e = u * u * (3 - 2 * u), cx = me.hx + (me.wx - me.hx) * .35, cy = Math.min(me.hy, me.wy) - H * .1, a = (1 - e) * (1 - e), b = 2 * (1 - e) * e, c = e * e; return { x: a * me.hx + b * cx + c * me.wx, y: a * me.hy + b * cy + c * me.wy }; }
+  if (t < T3) { const u = (t - T2) / (T3 - T2), e = 1 - Math.pow(1 - u, 3); return { x: me.wx + (me.ex - me.wx) * e, y: me.wy + (me.ey - me.wy) * e }; }
+  return { x: me.ex + (t - T3) * 3, y: me.ey };
+}
+function drawBubble(x, y, size, alpha) {
+  const fs = clamp(W * .016, 14, 19); ctx.save(); ctx.globalAlpha = alpha; ctx.font = `500 ${fs}px Prompt, sans-serif`;
+  const maxW = Math.min(300, W * .8), lines = wrapText(ctx, state.wish, maxW), lh = fs * 1.5;
+  const tw = Math.max(...lines.map(l => ctx.measureText(l).width), 60), bw = tw + 30, bh = lines.length * lh + fs * 1.9;
+  const bx = clamp(x - bw / 2, 10, W - bw - 10), by = Math.max(100, y - size * .95 - bh);
+  ctx.fillStyle = 'rgba(6,16,46,.78)'; ctx.strokeStyle = 'rgba(255,201,51,.55)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff6dc'; lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + fs * 1.15 + i * lh));
+  ctx.fillStyle = '#ffc933'; ctx.font = `500 ${fs * .85}px Prompt, sans-serif`; ctx.fillText('— ' + state.nick, bx + bw / 2, by + bh - fs * .5);
+  ctx.beginPath(); ctx.moveTo(clamp(x, bx + 14, bx + bw - 14) - 7, by + bh); ctx.lineTo(clamp(x, bx + 14, bx + bw - 14), by + bh + 9); ctx.lineTo(clamp(x, bx + 14, bx + bw - 14) + 7, by + bh); ctx.fillStyle = 'rgba(6,16,46,.78)'; ctx.fill(); ctx.restore();
+}
+
+/* --- main loop --- */
+let last = performance.now(), T = 0;
+function frame(now) {
+  requestAnimationFrame(frame); if (document.hidden) { last = now; return; }
+  const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt; update(dt); draw(T);
+}
+function update(dt) {
+  sceneFade = Math.max(0, sceneFade - dt * 1.3); zoom = Math.max(0, zoom - dt * .35);
+  lanterns.forEach(l => { l.y -= l.v * dt; l.x += Math.sin(T * .5 + l.ph) * 6 * dt; if (l.y < -20) Object.assign(l, newLantern(false)); });
+  floaters.forEach(f => { f.x += f.vx * dt; if (f.x > W + 80) f.x = -80; });
+  rings.forEach(r => { r.r += 40 * dt; r.a -= dt * .7; }); rings = rings.filter(r => r.a > 0);
+  if (spot.scene === 'naga') { orbT -= dt; if (orbT <= 0) { orbT = rand(.12, .4); orbs.push({ x: rand(.2, .92) * W, y: horizon + rand(.05, .6) * (H - horizon), vy: rand(110, 210), life: 0, max: rand(1.4, 2.4) }); } orbs.forEach(o => { o.y -= o.vy * dt; o.life += dt; }); orbs = orbs.filter(o => o.life < o.max); }
+  if (me.state !== 'none') {
+    me.t += dt; const p = mePos(me.t); me.x = p.x; me.y = p.y;
+    if (!me.splash && me.t >= 3.4) { me.splash = true; rings.push({ x: me.wx, y: me.wy, r: 6, a: 1 }); rings.push({ x: me.wx, y: me.wy, r: 0, a: .8 }); }
+    if (me.t > 3.4 && Math.random() < dt * 1.6) rings.push({ x: me.x, y: me.y + 4, r: 4, a: .7 });
+  }
+}
+function draw(t) {
+  ctx.save();
+  if (zoom > 0) { const z = 1 + zoom * .06; ctx.translate(W / 2, H * .55); ctx.scale(z, z); ctx.translate(-W / 2, -H * .55); }
+  // sky
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon); sky.addColorStop(0, '#030a22'); sky.addColorStop(.55, '#0a1f5c'); sky.addColorStop(1, '#2a5fcb'); ctx.fillStyle = sky; ctx.fillRect(-40, -40, W + 80, horizon + 41);
+  const hg = ctx.createRadialGradient(W * .5, horizon, 0, W * .5, horizon, W * .7); hg.addColorStop(0, 'rgba(255,201,51,.3)'); hg.addColorStop(1, 'rgba(255,201,51,0)'); ctx.fillStyle = hg; ctx.fillRect(-40, 0, W + 80, horizon);
+  stars.forEach(s => { ctx.fillStyle = `rgba(255,246,220,${.35 + .65 * Math.max(0, Math.sin(t * s.sp + s.ph))})`; ctx.fillRect(s.x, s.y, s.r, s.r); });
+  // moon
+  const mx = W * spot.moon[0], my = horizon * spot.moon[1], mr = Math.min(W, H) * .055;
+  const mh = ctx.createRadialGradient(mx, my, mr * .6, mx, my, mr * 6); mh.addColorStop(0, 'rgba(255,230,150,.38)'); mh.addColorStop(1, 'rgba(255,230,150,0)'); ctx.fillStyle = mh; ctx.fillRect(mx - mr * 6, my - mr * 6, mr * 12, mr * 12);
+  ctx.fillStyle = '#fff3c4'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(214,180,90,.28)'; [[-.3, -.2, .22], [.25, .1, .3], [-.1, .35, .16]].forEach(c => { ctx.beginPath(); ctx.arc(mx + c[0] * mr, my + c[1] * mr, c[2] * mr, 0, 7); ctx.fill(); });
+  // lanterns
+  lanterns.forEach(l => { const f = .75 + .25 * Math.sin(t * l.fl + l.ph), a = clamp((horizon - l.y) / 40, 0, 1) * clamp(l.y / 60 + .3, 0, 1);
+    const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.s * 3.2); g.addColorStop(0, `rgba(255,214,110,${.55 * f * a})`); g.addColorStop(1, 'rgba(255,214,110,0)'); ctx.fillStyle = g; ctx.fillRect(l.x - l.s * 3.2, l.y - l.s * 3.2, l.s * 6.4, l.s * 6.4);
+    ctx.fillStyle = `rgba(255,${200 + 30 * f | 0},90,${.95 * a})`; ctx.beginPath(); ctx.ellipse(l.x, l.y, l.s * .55, l.s * .75, 0, 0, 7); ctx.fill(); });
+  // landmark
+  if (lmCv) ctx.drawImage(lmCv, 0, horizon - lmH, W, lmH);
+  // water
+  const wt = ctx.createLinearGradient(0, horizon, 0, H); wt.addColorStop(0, '#1b49a8'); wt.addColorStop(.35, '#0b2260'); wt.addColorStop(1, '#040c26'); ctx.fillStyle = wt; ctx.fillRect(-40, horizon, W + 80, H - horizon + 40);
+  // landmark reflection
+  if (lmCv) { const sh = 3; ctx.globalAlpha = .34; for (let sy = 0; sy < lmH; sy += sh) { const dy = horizon + (lmH - sy - sh) * .92; const wob = Math.sin(t * 1.6 + sy * .14) * (1.5 + (lmH - sy) * .018); ctx.drawImage(lmCv, 0, sy * DPR, lmCv.width, sh * DPR, wob, dy, W, sh); } ctx.globalAlpha = 1; }
+  // moon column
+  for (let i = 0; i < 42; i++) { const y = horizon + 4 + i * (H - horizon) / 75, w = mr * (1.7 - i * .02) * (.45 + .55 * Math.abs(Math.sin(t * 1.9 + i * .9))); ctx.fillStyle = `rgba(255,224,138,${(1 - i / 42) * .5})`; ctx.fillRect(mx - w / 2 + Math.sin(t * 1.7 + i * .8) * 3, y, w, 2); }
+  // waves
+  ctx.lineWidth = 1; for (let k = 0; k < 22; k++) { const d = k / 22, y = horizon + 6 + d * d * (H - horizon - 6), amp = 1 + d * 3.5; ctx.strokeStyle = `rgba(140,180,255,${.05 + .12 * d})`; ctx.lineWidth = 1 + d * 1.4; ctx.beginPath(); for (let x = 0; x <= W + 24; x += 24) { const yy = y + Math.sin(x * .02 + t * (.8 + d) + k) * amp; x ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); } ctx.stroke(); }
+  glints.forEach(g => { const v = Math.sin(t * g.sp + g.ph); if (v > .86) { ctx.fillStyle = `rgba(255,236,170,${(v - .86) * 5})`; ctx.fillRect(g.x * W, horizon + 8 + g.y * g.y * (H - horizon - 12), 2 + g.y * 8, 1.5); } });
+  // mist band
+  const mist = ctx.createLinearGradient(0, horizon - 22, 0, horizon + 26); mist.addColorStop(0, 'rgba(120,160,255,0)'); mist.addColorStop(.5, 'rgba(150,185,255,.22)'); mist.addColorStop(1, 'rgba(120,160,255,0)'); ctx.fillStyle = mist; ctx.fillRect(-40, horizon - 22, W + 80, 48);
+  // foreground bank
+  const bk = ctx.createLinearGradient(0, H * .75, 0, H); bk.addColorStop(0, '#07122e'); bk.addColorStop(1, '#020615'); ctx.fillStyle = bk; ctx.beginPath(); ctx.moveTo(-40, H * .76); ctx.bezierCurveTo(W * .1, H * .77, W * .2, H * .9, W * .34, H + 4); ctx.lineTo(-40, H + 4); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,201,51,.18)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-40, H * .76); ctx.bezierCurveTo(W * .1, H * .77, W * .2, H * .9, W * .34, H + 4); ctx.stroke();
+  // floaters (+ me) sorted by depth
+  const list = floaters.map(f => ({ y: floaterY(f), f })); if (me.state !== 'none') list.push({ y: me.y, me: true }); list.sort((a, b) => a.y - b.y);
+  rings.forEach(r => { ctx.strokeStyle = `rgba(255,224,138,${clamp(r.a, 0, 1) * .6})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, r.r, r.r * .3, 0, 0, 7); ctx.stroke(); });
+  list.forEach(it => {
+    if (it.me) { const s = sizeAtY(me.y) * (me.t < 1.4 ? 1.1 : 1); drawKrathong(me.img, me.x, me.y, s, t, 1.3, 1, 1.5); if (me.t > 3.9) drawBubble(me.x, me.y, s, clamp((me.t - 3.9) / 1.2, 0, 1)); }
+    else { const f = it.f, age = (performance.now() - f.born) / 1000, a = clamp(age / 1.2, 0, 1); drawKrathong(f.img, f.x, it.y, sizeAtY(it.y), t, f.seed, a * (.55 + .45 * f.d), .8); }
+  });
+  // naga fireballs
+  orbs.forEach(o => { const u = o.life / o.max, a = Math.sin(u * Math.PI); const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, 22); g.addColorStop(0, `rgba(255,240,170,${a})`); g.addColorStop(.4, `rgba(255,170,60,${a * .6})`); g.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = g; ctx.fillRect(o.x - 22, o.y - 22, 44, 44); ctx.strokeStyle = `rgba(255,200,90,${a * .4})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x, o.y + 40 * a); ctx.stroke(); });
+  ctx.restore();
+  if (sceneFade > 0) { ctx.fillStyle = `rgba(4,11,31,${sceneFade})`; ctx.fillRect(0, 0, W, H); }
+}
+
+/* ========================= BOOT ========================= */
+async function boot() {
+  resize(); addEventListener('resize', () => { resize(); if (me.state === 'parked' || me.state === 'float') { /* keep going */ } });
+  try { document.fonts.load('500 16px Prompt'); } catch (e) {}
+  Object.keys(KRATHONGS).forEach(k => kImg(k));
+  requestAnimationFrame(frame);
+  await initData();
+  // shared link ?k=<uuid>
+  const k = new URLSearchParams(location.search).get('k');
+  if (k && sb && live && /^[0-9a-f-]{36}$/i.test(k)) {
+    const { data } = await sb.from('krathongs').select('*').eq('id', k).maybeSingle();
+    if (data && SPOT[data.spot_id]) {
+      Object.assign(state, { gender: data.gender, outfit: data.outfit, krathong: data.krathong, spot: data.spot_id, nick: data.nickname, wish: data.wish, id: data.id, saved: true });
+      setScene(SPOT[data.spot_id]); go('view');
+      $('#viewTitle').textContent = `กระทงของ ${data.nickname}`; $('#viewSub').textContent = `ลอยที่ ${SPOT[data.spot_id].name} · “${data.wish}”`;
+      me.img = kImg(data.krathong); me.state = 'parked';
+      setTimeout(() => { Object.assign(me, { hx: W * .2, hy: H * .8, wx: W * .3, wy: H * .87, ex: W * (W < 700 ? .56 : .6), ey: horizon + (H - horizon) * .22 }); me.t = 13; }, 0);
+      return;
+    }
+  }
+  go('intro');
+}
+boot();
+})();
+</script>
+</body>
+</html>
