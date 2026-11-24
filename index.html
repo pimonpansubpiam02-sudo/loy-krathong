@@ -37,6 +37,8 @@ button{font:inherit;color:inherit}
 .stats{display:flex;gap:8px;font-size:12.5px}
 .chip{padding:5px 11px;border-radius:99px;background:rgba(15,38,86,.78);border:1px solid var(--line);white-space:nowrap}
 .chip b{color:var(--gold);font-weight:600}
+.music-toggle{font-size:12px;color:var(--cream);cursor:pointer}
+.music-toggle[aria-pressed="true"]{border-color:var(--gold);color:var(--gold2);box-shadow:0 0 12px rgba(255,201,51,.18)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#46e08a;margin-right:6px;box-shadow:0 0 8px #46e08a;animation:pulse 1.6s infinite}
 .dot.demo{background:var(--gold);box-shadow:0 0 8px var(--gold)}
 @keyframes pulse{50%{opacity:.35}}
@@ -185,6 +187,7 @@ input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(25
       <span class="chip"><span class="dot" id="liveDot"></span><span id="liveTxt">Live</span> · ลอยแล้ว <b id="totalCnt">0</b> ใบ</span>
       <span class="chip hide-m">ออนไลน์ <b id="onlineCnt">1</b> คน</span>
     </div>
+    <button class="chip music-toggle" id="musicToggle" type="button" aria-pressed="false">♪ เพลงอัตโนมัติ</button>
   </div>
   <div id="ticker" aria-label="คำอวยพรล่าสุด"><div id="tickerTrack"></div></div>
 </header>
@@ -726,6 +729,79 @@ async function saveKrathong() {
 /* ========================= UI HELPERS ========================= */
 let toastT;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3200); }
+let musicContext = null, musicGain = null, musicTimer = null, musicStep = 0, musicStarting = false, musicAutoStart = true;
+const musicNotes = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 698.46, 659.25, 783.99, 1046.5, 783.99, 698.46, 880, 987.77, 880];
+function playMusicTone(frequency, duration, volume, type) {
+  if (!musicContext || !musicGain) return;
+  const osc = musicContext.createOscillator(), envelope = musicContext.createGain();
+  const now = musicContext.currentTime;
+  osc.type = type; osc.frequency.value = frequency;
+  envelope.gain.setValueAtTime(.0001, now);
+  envelope.gain.exponentialRampToValueAtTime(volume, now + .025);
+  envelope.gain.exponentialRampToValueAtTime(.0001, now + duration);
+  osc.connect(envelope); envelope.connect(musicGain);
+  osc.onended = () => { osc.disconnect(); envelope.disconnect(); };
+  osc.start(now); osc.stop(now + duration + .02);
+}
+function playMusicBeat() {
+  const frequency = musicNotes[musicStep % musicNotes.length];
+  playMusicTone(frequency, .31, .55, 'triangle');
+  if (musicStep % 4 === 0) playMusicTone(frequency / 2, .42, .24, 'sine');
+  if (musicStep % 2 === 1) playMusicTone(frequency * 2, .16, .12, 'sine');
+  musicStep++;
+}
+async function startMusic(quiet = false) {
+  const button = $('#musicToggle');
+  if (button.getAttribute('aria-pressed') === 'true' || musicStarting) return;
+  musicStarting = true;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  try {
+    if (!AudioContextClass) throw new Error('Audio playback is not supported');
+    if (!musicContext) {
+      musicContext = new AudioContextClass();
+      musicGain = musicContext.createGain();
+      musicGain.gain.value = .0001;
+      musicGain.connect(musicContext.destination);
+    }
+    await musicContext.resume();
+    if (musicContext.state !== 'running') {
+      if (!quiet) toast('แตะหน้าจอเพื่อเริ่มเพลง');
+      return;
+    }
+    musicGain.gain.setTargetAtTime(.055, musicContext.currentTime, .3);
+    button.setAttribute('aria-pressed', 'true'); button.textContent = '♪ ปิดเพลง';
+    playMusicBeat(); musicTimer = setInterval(playMusicBeat, 350);
+  } catch (error) {
+    console.error('Music playback failed', error);
+    if (!quiet) toast('เปิดเพลงไม่สำเร็จ');
+  } finally {
+    musicStarting = false;
+  }
+}
+function stopMusic() {
+  clearInterval(musicTimer); musicTimer = null;
+  const button = $('#musicToggle');
+  button.setAttribute('aria-pressed', 'false'); button.textContent = '♪ เปิดเพลง';
+  if (musicGain) musicGain.gain.setTargetAtTime(.0001, musicContext.currentTime, .08);
+  setTimeout(() => { if (button.getAttribute('aria-pressed') === 'false' && musicContext) musicContext.suspend(); }, 500);
+}
+async function toggleMusic() {
+  const button = $('#musicToggle'), enabled = button.getAttribute('aria-pressed') === 'true';
+  musicAutoStart = !enabled;
+  if (enabled) stopMusic();
+  else await startMusic();
+}
+function resumeMusicAfterGesture(event) {
+  const target = event.target;
+  if (!musicAutoStart || (target && target.closest && target.closest('#musicToggle'))) return;
+  document.removeEventListener('pointerdown', resumeMusicAfterGesture);
+  document.removeEventListener('keydown', resumeMusicAfterGesture);
+  startMusic(true);
+}
+$('#musicToggle').onclick = toggleMusic;
+document.addEventListener('pointerdown', resumeMusicAfterGesture);
+document.addEventListener('keydown', resumeMusicAfterGesture);
+startMusic(true);
 const ORDER = ['intro', 'gender', 'outfit', 'krathong', 'map', 'scene', 'wish', 'float', 'share', 'view'];
 const CENTER = ['intro', 'gender', 'outfit', 'krathong', 'map'];
 const panel = $('#panel'), dock = $('#avatarDock');
