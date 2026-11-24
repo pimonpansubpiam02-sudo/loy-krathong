@@ -222,7 +222,7 @@ input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(25
         <img id="profilePreview" class="photo-preview" alt="ตัวอย่างรูปโปรไฟล์">
         <button class="btn ghost sm" id="removePhoto" type="button" hidden>เอารูปออก</button>
       </div>
-      <p class="privacy-note">รูปถูกย่อและไม่อัปโหลดไปยังเซิร์ฟเวอร์ การ์ดที่ดาวน์โหลดจะมีรูปนี้ ส่วนลิงก์ออนไลน์จะไม่มีรูป</p>
+      <p class="privacy-note">รูปจะถูกย่อและส่งไปเก็บแบบส่วนตัวเมื่อบันทึก เพื่อให้เจ้าของเว็บดูได้ใน Supabase Dashboard เท่านั้น รูปของคนอื่นจะไม่แสดงบนหน้าเว็บ</p>
       <div class="custom-grid" style="margin-top:10px">
         <div><label for="avatarHairColor">สีผม</label><input id="avatarHairColor" type="color" value="#14193a"></div>
         <div><label for="avatarSkinColor">สีผิว</label><input id="avatarSkinColor" type="color" value="#f3cfa6"></div>
@@ -692,8 +692,29 @@ async function saveKrathong() {
   const row = { id: genUUID(), nickname: state.nick, wish: state.wish, gender: state.gender, outfit: state.outfit, krathong: state.krathong, spot_id: state.spot };
   const spotData = customSpotData(SPOT[state.spot]);
   if (spotData) row.spot_data = spotData;
+  if (state.profileImage && (!sb || !live)) {
+    toast('อัปโหลดรูปไม่ได้ในโหมดสาธิต กรุณาตรวจการเชื่อมต่อ Supabase');
+    return;
+  }
   seen.add(row.id); state.id = row.id; state.saved = false;
   if (sb && live) {
+    if (state.profileImage) {
+      try {
+        const photo = await fetch(state.profileImage).then(response => response.blob());
+        const path = `photos/${row.id}.jpg`;
+        const { error: uploadError } = await sb.storage.from('krathong-photos').upload(path, photo, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+        if (uploadError) throw uploadError;
+        row.profile_image_path = path;
+      } catch (error) {
+        console.error('Profile photo upload failed', error);
+        toast('อัปโหลดรูปไม่สำเร็จ: ' + error.message);
+        seen.delete(row.id);
+        return;
+      }
+    }
     const { error } = await sb.from('krathongs').insert(row);
     if (error) { toast('บันทึกคำอวยพรไม่สำเร็จ: ' + error.message); seen.delete(row.id); return; }
     state.saved = true;
@@ -810,7 +831,7 @@ $('#profilePhoto').onchange = async e => {
     state.profileImage = canvas.toDataURL('image/jpeg', .82);
     URL.revokeObjectURL(url);
     renderOutfits();
-    toast('เพิ่มรูปแล้ว รูปนี้ใช้เฉพาะในอุปกรณ์นี้');
+    toast('เพิ่มรูปแล้ว เมื่อบันทึกจะส่งรูปย่อไปเก็บแบบส่วนตัว');
   };
   image.onerror = () => { URL.revokeObjectURL(url); toast('อ่านรูปไม่สำเร็จ ลองเลือกรูปอื่น'); };
   image.src = url;
